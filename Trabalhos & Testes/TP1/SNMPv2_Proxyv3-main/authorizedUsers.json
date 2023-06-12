@@ -1,0 +1,16 @@
+{
+    "adminTeste":{
+        "username":"adminTeste",
+        "password":"password",
+        "status": "0",
+        "IP": "",
+        "pKey ": ""
+    },
+    "adminTestes2":{
+        "username":"adminTeste",
+        "password":"password",
+        "status": "0",
+        "IP" : "",
+        "key" : ""
+    }
+}

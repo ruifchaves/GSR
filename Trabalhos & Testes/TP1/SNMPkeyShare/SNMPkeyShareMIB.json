@@ -1,0 +1,117 @@
+{
+    "snmpKeyShareMib": {
+      "SYSTEM": {
+        "systemRestartDate": {
+          "syntax": "INTEGER",
+          "max-access": "read-only",
+          "status": "current",
+          "description": "The date (YY*104+MM*102+DD) when the agent has started a new Z matrix."
+        },
+        "systemRestartTime": {
+          "syntax": "INTEGER",
+          "max-access": "read-only",
+          "status": "current",
+          "description": "The time (HH*104+MM*102+SS) when the agent has started a new Z matrix."
+        },
+        "systemKeySize": {
+          "syntax": "INTEGER",
+          "max-access": "read-write",
+          "status": "current",
+          "description": "The number of bytes (K) of each generated key."
+        },
+        "systemIntervalUpdate": {
+          "syntax": "INTEGER",
+          "max-access": "read-write",
+          "status": "current",
+          "description": "The number of milliseconds of the updating interval of the internal Z matrix."
+        },
+        "systemMaxNumberOfKeys": {
+          "syntax": "INTEGER",
+          "max-access": "read-write",
+          "status": "current",
+          "description": "The maximum number of generated keys that are still valid."
+        },
+        "systemKeysTimeToLive": {
+          "syntax": "INTEGER",
+          "max-access": "read-write",
+          "status": "current",
+          "description": "The number of seconds of the TTL of the generated keys."
+        }
+      },
+
+      "CONFIG": {
+        "configMasterKey": {
+          "syntax": "OCTET STRING",
+          "max-access": "read-write",
+          "status": "current",
+          "description": "The master double key M with at least K*2 bytes in size."
+        },
+        "configFirstCharOfKeysAlphabet": {
+          "syntax": "INTEGER",
+          "max-access": "read-write",
+          "status": "current",
+          "description": "The ASCII code of the first character of the alphabet used in the keys (default=33)."
+        },
+        "configCardinalityOfKeysAlphabet": {
+          "syntax": "INTEGER",
+          "max-access": "read-write",
+          "status": "current",
+          "description": "The number of characters (Y) in the alphabet used in the keys (default=94)."
+        }
+      },
+
+      "DATA": {
+        "dataNumberOfValidKeys": {
+          "syntax": "INTEGER",
+          "max-access": "read-only",
+          "status": "current",
+          "description": "The number of elements in the dataTableGeneratedKeys."
+        },
+        "dataTableGeneratedKeys": {
+          "syntax": "SEQUENCE OF DataTableGeneratedKeysEntryType",
+          "access": "not-accessible",
+          "status": "mandatory",
+          "description": "A table with information from all created keys that are still valid."
+        }
+      }
+    },
+    "dataTableGeneratedKeysEntryType": {
+      "keyId": {
+        "syntax": "INTEGER",
+        "max-access": "read-only",
+        "status": "current",
+        "description": "The identification of a generated key."
+      },
+      "keyValue": {
+        "syntax": "OCTET STRING",
+        "max-access": "read-only",
+        "status": "current",
+        "description": "The value of a generated key (K bytes/characters long)."
+      },
+      "KeyRequester": {
+        "syntax": "OCTET STRING",
+        "max-access": "read-only",
+        "status": "current",
+        "description": "The identification of the manager/client that initially requested the key."
+      },
+      "keyExpirationDate": {
+        "syntax": "INTEGER",
+        "max-access": "read-only",
+        "status": "current",
+        "description": "The date (YY*104+MM*102+DD) when the key will expire."
+      },
+      "keyExpirationTime": {
+        "syntax": "INTEGER",
+        "max-access": "read-only",
+        "status": "current",
+        "description": "The time (HH*104+MM*102+SS) when the key will expire."
+      },
+      "keyVisibility": {
+        "syntax": "INTEGER",
+        "max-access": "read-write",
+        "status": "current",
+        "description": "0 - Key value is not visible; 1 - key value is only visible to the requester; 2 - key value is visible to anyone."
+      }
+    }
+  }
+  

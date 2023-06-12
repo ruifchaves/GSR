@@ -1,0 +1,133 @@
+{
+    "Defs": {
+        "Table": {
+            "OBJECT-TYPE": "MIBsec",
+            "SYNTAX": "SEQUENCE OF Linha",
+            "STATUS": "current",
+            "DESCRIPTION": "Tabela para guardar resultados das queries dos agentes remotos",
+            "ASSOCIATED OBJECTS:": "Linha"
+        },
+        "Linha": {
+            "OBJECT-TYPE": "Linha",
+            "SYNTAX": "Linha",
+            "MAX-ACCESS": "not-accessible",
+            "STATUS": "current",
+            "DESCRIPTION": "Linha que descreve dados de um pedido",
+            "INDEX": "idOper"
+        }
+    },
+    "Lines": {
+        "SEQUENCE": {
+            "idOper": "INTEGER",
+            "typeOper": "INTEGER",
+            "idSource": "OCTET STRING",
+            "idDestination": "OCTET STRING",
+            "oidArg": "OCTET STRING",
+            "valueArg": "Opaque",
+            "typeArg": "INTEGER",
+            "sizeArg": "INTEGER",
+            "setValueType": "OCTET STRING",
+            "setType": "INTEGER"
+        },
+        "1": {
+            "OBJECT-TYPE": "idOper",
+            "SYNTAX": "INTEGER",
+            "MAX-ACCESS": "not-accessible",
+            "STATUS": "current",
+            "DESCRIPTION": "Inteiro identificador do pedido efectuado",
+            "1": "1",
+            "2": "2",
+            "3": "3"
+        },
+        "2": {
+            "OBJECT-TYPE": "typeOper",
+            "SYNTAX": "INTEGER",
+            "MAX-ACCESS": "not-accessible",
+            "STATUS": "current",
+            "DESCRIPTION": "Inteiro representativo do tipo de operacao 0(get-request), 1(get-bulk), 2(set-request)",
+            "1": 1,
+            "2": 1,
+            "3": "get-request"
+        },
+        "3": {
+            "OBJECT-TYPE": "idSource",
+            "SYNTAX": "OCTET STRING",
+            "MAX-ACCESS": "not-accessible",
+            "STATUS": "current",
+            "DESCRIPTION": "String que representa o identificador do agente que efectuou o pedido",
+            "1": "None",
+            "2": "None",
+            "3": "None"
+        },
+        "4": {
+            "OBJECT-TYPE": "idDestination",
+            "SYNTAX": "OCTET STRING",
+            "MAX-ACCESS": "not-accessible",
+            "STATUS": "current",
+            "DESCRIPTION": "String que representa o identificador do agente SNMPv2 que recebeu o pedido",
+            "1": "127.0.0.2",
+            "2": "127.0.0.2",
+            "3": "127.0.0.2"
+        },
+        "5": {
+            "OBJECT-TYPE": "oidArg",
+            "SYNTAX": "OCTET STRING",
+            "MAX-ACCESS": "not-accessible",
+            "STATUS": "current",
+            "DESCRIPTION": "String que representa o OID do pedido",
+            "1": "HWINFb",
+            "2": "HWINFO.0",
+            "3": "HWINFO.5"
+        },
+        "6": {
+            "OBJECT-TYPE": "valueArg",
+            "SYNTAX": "Opaque",
+            "MAX-ACCESS": "not-accessible",
+            "STATUS": "current",
+            "DESCRIPTION": "Dados recebidos como resposta ao pedido, em bytes pois o seu tipo \u00e9 gen\u00e9rico",
+            "1": "",
+            "2": "CPU INFO: AMD Ryzen 9 5900X 12-Core Processor\nOS: \"Ubuntu 22.04 LTS\"\nCPU Usage: CPU Usage: 5.1%\nAvailable RAM: RAM Usage: 12.7%\nAvailable Storage: Storage Usage: 4.1%\nUp Time: up 1 hour, 13 minutes\nHostname: snmpAgent",
+            "3": "Storage Usage: 4.1%"
+        },
+        "7": {
+            "OBJECT-TYPE": "typeArg",
+            "SYNTAX": "INTEGER",
+            "MAX-ACCESS": "not-accessible",
+            "STATUS": "current",
+            "DESCRIPTION": "Inteiro que representa o tipo de dados recebidos como resposta ao pedido",
+            "1": "STRING",
+            "2": "STRING",
+            "3": "STRING"
+        },
+        "8": {
+            "OBJECT-TYPE": "sizeArg",
+            "SYNTAX": "INTEGER",
+            "MAX-ACCESS": "not-accessible",
+            "STATUS": "current",
+            "DESCRIPTION": "Inteiro que representa o tamanho da resposta",
+            "1": "0",
+            "2": "217",
+            "3": "19"
+        },
+        "9": {
+            "OBJECT-TYPE": "setValueType",
+            "SYNTAX": "OCTET STRING",
+            "MAX-ACCESS": "not-accessible",
+            "STATUS": "current",
+            "DESCRIPTION": "String representativa do datatype a atribuir ao valor de um set request",
+            "1": "",
+            "2": "",
+            "3": ""
+        },
+        "10": {
+            "OBJECT-TYPE": "setValue",
+            "SYNTAX": "OCTET STRING",
+            "MAX-ACESSS": "not-accessible",
+            "STATUS": "current",
+            "DESCRIPTION": "String representativa do valor de um set request",
+            "1": "",
+            "2": "",
+            "3": ""
+        }
+    }
+}

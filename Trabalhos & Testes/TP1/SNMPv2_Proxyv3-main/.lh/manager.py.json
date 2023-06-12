@@ -1,0 +1,342 @@
+{
+    "sourceFile": "manager.py",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 81,
+            "patches": [
+                {
+                    "date": 1658392855750,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1658396460739,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -0,0 +1,33 @@\n+import threading, sys, time, random, os, socket\n+\n+\n+\n+class SNMPManager():\n+    def __init__(self):\n+        threading.Thread.__init__(self)\n+        self.requestPort = 161\n+        self.trapPort = 162 \n+        self.requestSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n+        self.trapSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n+        self.requestSocket.bind(('', self.requestPort))\n+        self.trapSocket.bind(('', self.trapPort))\n+        self.requestSocket.settimeout(1)\n+        self.trapSocket.settimeout(1)\n+        \n+        \n+    def init(self):\n+        rH = requestHandler(self.requestPort, self.requestSocket)\n+        rH.start()        \n+        \n+class requestHandler(threading.Thread):\n+    def __init__(self, port, socket):\n+        threading.Thread.__init__(self)\n+        self.port = port\n+        self.socket = socket\n+        self.targetProxy = \"\"\n+    def run(self):\n+        print(\"Bem Vindo ao SNMP Manager\")\n+        self.socket.sendto(\"\")\n+        \n+    \n+    \n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1658563083116,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -3,31 +3,20 @@\n \n \n class SNMPManager():\n     def __init__(self):\n-        threading.Thread.__init__(self)\n-        self.requestPort = 161\n-        self.trapPort = 162 \n-        self.requestSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n-        self.trapSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n-        self.requestSocket.bind(('', self.requestPort))\n-        self.trapSocket.bind(('', self.trapPort))\n-        self.requestSocket.settimeout(1)\n-        self.trapSocket.settimeout(1)\n+        self.port = 161\n+        self.ip = '127.0.0.4'\n+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n+        self.socket.bind((self.ip, self.port))\n+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\n+        self.proxyIP = \"\"\n         \n         \n     def init(self):\n-        rH = requestHandler(self.requestPort, self.requestSocket)\n-        rH.start()        \n+        print(\"Bem Vindo ao Manager SNMP\")\n+        print(\"Para comunicar com o Agente SNMP, utilize o comando:\")\n         \n-class requestHandler(threading.Thread):\n-    def __init__(self, port, socket):\n-        threading.Thread.__init__(self)\n-        self.port = port\n-        self.socket = socket\n-        self.targetProxy = \"\"\n-    def run(self):\n-        print(\"Bem Vindo ao SNMP Manager\")\n-        self.socket.sendto(\"\")\n         \n+        \n     \n     \n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1658563438413,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -11,12 +11,36 @@\n         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\n         self.proxyIP = \"\"\n         \n         \n-    def init(self):\n+    def login(self):\n         print(\"Bem Vindo ao Manager SNMP\")\n-        print(\"Para comunicar com o Agente SNMP, utilize o comando:\")\n+        proxyIP = input(\"Introduza o IP do Proxy:\")\n+        self.proxyIP = proxyIP\n+        input(\"Pressione ok para proceder à autenticação\")\n+        self.socket.sendto(\"login\".encode(), (proxyIP, self.port))\n+        while True:\n+            data,addr = self.socket.recvfrom(4096)\n+            if addr[0] == proxyIP:\n+                data = data.decode() \n+                if data == \"Username?\":\n+                    user = input(\"Introduza o Username:\")\n+                    self.socket.sendto(user.encode(), (proxyIP, self.port))\n+                elif data == \"Password?\":\n+                    password = input(\"Introduza a Password:\")\n+                    self.socket.sendto(password.encode(), (proxyIP, self.port))\n+                elif data == \"login-ack\":\n+                    print(\"Autenticação concluída\")\n+                    break\n+        self.waitForCommand()\n         \n+    def waitForCommand(self):\n         \n+        command = input(\"Introduza o comando:\")\n         \n     \n+    def request(self, command):\n+        \n+        \n+        \n+    \n     \n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1658565085062,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -33,14 +33,24 @@\n                     break\n         self.waitForCommand()\n         \n     def waitForCommand(self):\n-        \n         command = input(\"Introduza o comando:\")\n-        \n+        self.request(command)\n     \n     def request(self, command):\n+        self.socket.sendto(command.encode(), (self.proxyIP, self.port))\n+        while True:\n+            data,addr = self.socket.recvfrom(4096)\n+            if addr[0] == self.proxyIP:\n+                data = data.decode()\n+                if data == \"ack\":\n+                    break\n+                else:\n+                    print(data)\n+                    break\n+        while True:\n+            data, addr = self.socket.recvfrom(4096)\n+            response = data.decode()\n         \n-        \n-        \n     \n     \n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1658565134684,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -9,8 +9,9 @@\n         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n         self.socket.bind((self.ip, self.port))\n         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\n         self.proxyIP = \"\"\n+        self.login()\n         \n         \n     def login(self):\n         print(\"Bem Vindo ao Manager SNMP\")\n@@ -50,7 +51,13 @@\n                     break\n         while True:\n             data, addr = self.socket.recvfrom(4096)\n             response = data.decode()\n+            break\n+        print(response)\n+        self.waitForCommand()\n         \n+def main():\n+    sm = SNMPManager()\n     \n+    \n     \n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1658565141412,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -59,5 +59,13 @@\n def main():\n     sm = SNMPManager()\n     \n     \n+if __name__ == \"__main__\":\n+    main()\n+    #sm = SNMPManager()\n+    #sm.login()\n+    #sm.waitForCommand()\n+    #sm.request(\"get\n+    \n+    \n     \n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1658565282240,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -24,8 +24,9 @@\n             if addr[0] == proxyIP:\n                 data = data.decode() \n                 if data == \"Username?\":\n                     user = input(\"Introduza o Username:\")\n+                    msg = \"username \" + user\n                     self.socket.sendto(user.encode(), (proxyIP, self.port))\n                 elif data == \"Password?\":\n                     password = input(\"Introduza a Password:\")\n                     self.socket.sendto(password.encode(), (proxyIP, self.port))\n"
+                },
+                {
+                    "date": 1658565647596,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -25,11 +25,12 @@\n                 data = data.decode() \n                 if data == \"Username?\":\n                     user = input(\"Introduza o Username:\")\n                     msg = \"username \" + user\n-                    self.socket.sendto(user.encode(), (proxyIP, self.port))\n+                    self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"Password?\":\n                     password = input(\"Introduza a Password:\")\n+                    msg = \"password \" + password\n                     self.socket.sendto(password.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\")\n                     break\n"
+                },
+                {
+                    "date": 1658565772893,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -14,9 +14,10 @@\n         \n         \n     def login(self):\n         print(\"Bem Vindo ao Manager SNMP\")\n-        proxyIP = input(\"Introduza o IP do Proxy:\")\n+        #proxyIP = input(\"Introduza o IP do Proxy:\")\n+        proxyIP = \"127.0.0.3\"\n         self.proxyIP = proxyIP\n         input(\"Pressione ok para proceder à autenticação\")\n         self.socket.sendto(\"login\".encode(), (proxyIP, self.port))\n         while True:\n"
+                },
+                {
+                    "date": 1658565868027,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -30,9 +30,9 @@\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"Password?\":\n                     password = input(\"Introduza a Password:\")\n                     msg = \"password \" + password\n-                    self.socket.sendto(password.encode(), (proxyIP, self.port))\n+                    self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\")\n                     break\n         self.waitForCommand()\n"
+                },
+                {
+                    "date": 1658578731838,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -13,8 +13,10 @@\n         self.login()\n         \n         \n     def login(self):\n+        #clear terminal\n+        os.system('cls' if os.name == 'nt' else 'clear')\n         print(\"Bem Vindo ao Manager SNMP\")\n         #proxyIP = input(\"Introduza o IP do Proxy:\")\n         proxyIP = \"127.0.0.3\"\n         self.proxyIP = proxyIP\n"
+                },
+                {
+                    "date": 1658578759284,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -19,24 +19,23 @@\n         print(\"Bem Vindo ao Manager SNMP\")\n         #proxyIP = input(\"Introduza o IP do Proxy:\")\n         proxyIP = \"127.0.0.3\"\n         self.proxyIP = proxyIP\n-        input(\"Pressione ok para proceder à autenticação\")\n         self.socket.sendto(\"login\".encode(), (proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == proxyIP:\n                 data = data.decode() \n                 if data == \"Username?\":\n-                    user = input(\"Introduza o Username:\")\n+                    user = input(\"Introduza o Username:\\n\")\n                     msg = \"username \" + user\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"Password?\":\n-                    password = input(\"Introduza a Password:\")\n+                    password = input(\"Introduza a Password:\\n\")\n                     msg = \"password \" + password\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n-                    print(\"Autenticação concluída\")\n+                    print(\"Autenticação concluída\\n\")\n                     break\n         self.waitForCommand()\n         \n     def waitForCommand(self):\n"
+                },
+                {
+                    "date": 1658578766067,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -38,8 +38,10 @@\n                     break\n         self.waitForCommand()\n         \n     def waitForCommand(self):\n+        #clear terminal\n+        os.system('cls' if os.name == 'nt' else 'clear')\n         command = input(\"Introduza o comando:\")\n         self.request(command)\n     \n     def request(self, command):\n"
+                },
+                {
+                    "date": 1658578782214,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -59,8 +59,9 @@\n             data, addr = self.socket.recvfrom(4096)\n             response = data.decode()\n             break\n         print(response)\n+        input(\"Press Enter to continue...\")\n         self.waitForCommand()\n         \n def main():\n     sm = SNMPManager()\n"
+                },
+                {
+                    "date": 1658580659684,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -19,8 +19,9 @@\n         print(\"Bem Vindo ao Manager SNMP\")\n         #proxyIP = input(\"Introduza o IP do Proxy:\")\n         proxyIP = \"127.0.0.3\"\n         self.proxyIP = proxyIP\n+        input(\"Pressione Enter para continuar...\")\n         self.socket.sendto(\"login\".encode(), (proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == proxyIP:\n"
+                },
+                {
+                    "date": 1658580667352,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -19,9 +19,9 @@\n         print(\"Bem Vindo ao Manager SNMP\")\n         #proxyIP = input(\"Introduza o IP do Proxy:\")\n         proxyIP = \"127.0.0.3\"\n         self.proxyIP = proxyIP\n-        input(\"Pressione Enter para continuar...\")\n+        input(\"Pressione Enter para proceder à autenticação...\")\n         self.socket.sendto(\"login\".encode(), (proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == proxyIP:\n"
+                },
+                {
+                    "date": 1658580860758,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -58,8 +58,9 @@\n                     break\n         while True:\n             data, addr = self.socket.recvfrom(4096)\n             response = data.decode()\n+            self.socket.sendto(\"ack\".encode(), addr)\n             break\n         print(response)\n         input(\"Press Enter to continue...\")\n         self.waitForCommand()\n"
+                },
+                {
+                    "date": 1658580996203,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -28,11 +28,13 @@\n                 data = data.decode() \n                 if data == \"Username?\":\n                     user = input(\"Introduza o Username:\\n\")\n                     msg = \"username \" + user\n+                    os.system('cls' if os.name == 'nt' else 'clear')\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"Password?\":\n                     password = input(\"Introduza a Password:\\n\")\n+                    os.system('cls' if os.name == 'nt' else 'clear')\n                     msg = \"password \" + password\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\\n\")\n"
+                },
+                {
+                    "date": 1658654497742,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -47,8 +47,13 @@\n         command = input(\"Introduza o comando:\")\n         self.request(command)\n     \n     def request(self, command):\n+        \n+        if command == \"exit\":\n+            sys.exit()\n+        \n+        \n         self.socket.sendto(command.encode(), (self.proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == self.proxyIP:\n"
+                },
+                {
+                    "date": 1658654642429,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -50,10 +50,8 @@\n     def request(self, command):\n         \n         if command == \"exit\":\n             sys.exit()\n-        \n-        \n         self.socket.sendto(command.encode(), (self.proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == self.proxyIP:\n"
+                },
+                {
+                    "date": 1658666204439,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -43,8 +43,11 @@\n         \n     def waitForCommand(self):\n         #clear terminal\n         os.system('cls' if os.name == 'nt' else 'clear')\n+        print(\"----------------------------------------------------\")\n+        print(\"Comandos disponíveis:\")\n+        print(\"get-request <OID>, get-next, get-bulk, set-request, exit\")\n         command = input(\"Introduza o comando:\")\n         self.request(command)\n     \n     def request(self, command):\n"
+                },
+                {
+                    "date": 1658668038784,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -45,9 +45,9 @@\n         #clear terminal\n         os.system('cls' if os.name == 'nt' else 'clear')\n         print(\"----------------------------------------------------\")\n         print(\"Comandos disponíveis:\")\n-        print(\"get-request <OID>, get-next, get-bulk, set-request, exit\")\n+        print(\"get-request <OID>, get-bulk, set-request, exit\")\n         command = input(\"Introduza o comando:\")\n         self.request(command)\n     \n     def request(self, command):\n"
+                },
+                {
+                    "date": 1658748833606,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -46,8 +46,9 @@\n         os.system('cls' if os.name == 'nt' else 'clear')\n         print(\"----------------------------------------------------\")\n         print(\"Comandos disponíveis:\")\n         print(\"get-request <OID>, get-bulk, set-request, exit\")\n+        print(\"----------------------------------------------------\")\n         command = input(\"Introduza o comando:\")\n         self.request(command)\n     \n     def request(self, command):\n"
+                },
+                {
+                    "date": 1658748871362,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -45,9 +45,9 @@\n         #clear terminal\n         os.system('cls' if os.name == 'nt' else 'clear')\n         print(\"----------------------------------------------------\")\n         print(\"Comandos disponíveis:\")\n-        print(\"get-request <OID>, get-bulk, set-request, exit\")\n+        print(\"get-request <OID> \\n get-bulk <OID> \\n set-request <OID> <type> <value>\\n exit\")\n         print(\"----------------------------------------------------\")\n         command = input(\"Introduza o comando:\")\n         self.request(command)\n     \n"
+                },
+                {
+                    "date": 1658748885475,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -20,8 +20,10 @@\n         #proxyIP = input(\"Introduza o IP do Proxy:\")\n         proxyIP = \"127.0.0.3\"\n         self.proxyIP = proxyIP\n         input(\"Pressione Enter para proceder à autenticação...\")\n+                            os.system('cls' if os.name == 'nt' else 'clear')\n+\n         self.socket.sendto(\"login\".encode(), (proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == proxyIP:\n"
+                },
+                {
+                    "date": 1658748995625,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -20,10 +20,9 @@\n         #proxyIP = input(\"Introduza o IP do Proxy:\")\n         proxyIP = \"127.0.0.3\"\n         self.proxyIP = proxyIP\n         input(\"Pressione Enter para proceder à autenticação...\")\n-                            os.system('cls' if os.name == 'nt' else 'clear')\n-\n+        os.system('cls' if os.name == 'nt' else 'clear')\n         self.socket.sendto(\"login\".encode(), (proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == proxyIP:\n"
+                },
+                {
+                    "date": 1658749018174,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,8 +1,6 @@\n-import threading, sys, time, random, os, socket\n+import sys,os,socket,pyotp\n \n-\n-\n class SNMPManager():\n     def __init__(self):\n         self.port = 161\n         self.ip = '127.0.0.4'\n"
+                },
+                {
+                    "date": 1658749180162,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -34,8 +34,13 @@\n                     password = input(\"Introduza a Password:\\n\")\n                     os.system('cls' if os.name == 'nt' else 'clear')\n                     msg = \"password \" + password\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n+                elif data =\"2FA?:\"\n+                    secret = user + password\n+                    totp = pyotp.TOTP(\"secret\")\n+                    print(\"Current 2FA code: \" + totp.now())\n+                    input(\"Insira o código 2FA\")\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\\n\")\n                     break\n         self.waitForCommand()\n"
+                },
+                {
+                    "date": 1658753580294,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -39,8 +39,10 @@\n                     secret = user + password\n                     totp = pyotp.TOTP(\"secret\")\n                     print(\"Current 2FA code: \" + totp.now())\n                     input(\"Insira o código 2FA\")\n+                    self.socket.sendto(totp.now().encode(), (proxyIP, self.port))\n+\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\\n\")\n                     break\n         self.waitForCommand()\n"
+                },
+                {
+                    "date": 1658753588715,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -34,15 +34,14 @@\n                     password = input(\"Introduza a Password:\\n\")\n                     os.system('cls' if os.name == 'nt' else 'clear')\n                     msg = \"password \" + password\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n-                elif data =\"2FA?:\"\n+                elif data == \"2FA?:\"\n                     secret = user + password\n                     totp = pyotp.TOTP(\"secret\")\n                     print(\"Current 2FA code: \" + totp.now())\n                     input(\"Insira o código 2FA\")\n                     self.socket.sendto(totp.now().encode(), (proxyIP, self.port))\n-\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\\n\")\n                     break\n         self.waitForCommand()\n"
+                },
+                {
+                    "date": 1658753817123,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -34,14 +34,15 @@\n                     password = input(\"Introduza a Password:\\n\")\n                     os.system('cls' if os.name == 'nt' else 'clear')\n                     msg = \"password \" + password\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n-                elif data == \"2FA?:\"\n+                elif data == \"2FA?\":   \n                     secret = user + password\n                     totp = pyotp.TOTP(\"secret\")\n                     print(\"Current 2FA code: \" + totp.now())\n-                    input(\"Insira o código 2FA\")\n-                    self.socket.sendto(totp.now().encode(), (proxyIP, self.port))\n+                    var = input(\"Insira o código 2FA\")\n+                    auth = \"2FA \" + var\n+                    self.socket.sendto(.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\\n\")\n                     break\n         self.waitForCommand()\n"
+                },
+                {
+                    "date": 1658753823842,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -40,9 +40,9 @@\n                     totp = pyotp.TOTP(\"secret\")\n                     print(\"Current 2FA code: \" + totp.now())\n                     var = input(\"Insira o código 2FA\")\n                     auth = \"2FA \" + var\n-                    self.socket.sendto(.encode(), (proxyIP, self.port))\n+                    self.socket.sendto(auth.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\\n\")\n                     break\n         self.waitForCommand()\n"
+                },
+                {
+                    "date": 1658753943122,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -36,9 +36,9 @@\n                     msg = \"password \" + password\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"2FA?\":   \n                     secret = user + password\n-                    totp = pyotp.TOTP(\"secret\")\n+                    totp = str(pyotp.TOTP(\"secret\"))\n                     print(\"Current 2FA code: \" + totp.now())\n                     var = input(\"Insira o código 2FA\")\n                     auth = \"2FA \" + var\n                     self.socket.sendto(auth.encode(), (proxyIP, self.port))\n"
+                },
+                {
+                    "date": 1658753985416,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -36,10 +36,10 @@\n                     msg = \"password \" + password\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"2FA?\":   \n                     secret = user + password\n-                    totp = str(pyotp.TOTP(\"secret\"))\n-                    print(\"Current 2FA code: \" + totp.now())\n+                    totp = pyotp.TOTP(\"secret\")\n+                    print(\"Current 2FA code: \" + str(totp.now()))\n                     var = input(\"Insira o código 2FA\")\n                     auth = \"2FA \" + var\n                     self.socket.sendto(auth.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n"
+                },
+                {
+                    "date": 1658754019521,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -37,9 +37,9 @@\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"2FA?\":   \n                     secret = user + password\n                     totp = pyotp.TOTP(\"secret\")\n-                    print(\"Current 2FA code: \" + str(totp.now()))\n+                    #print(\"Current 2FA code: \" + str(totp.now()))\n                     var = input(\"Insira o código 2FA\")\n                     auth = \"2FA \" + var\n                     self.socket.sendto(auth.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n"
+                },
+                {
+                    "date": 1658754118324,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -38,9 +38,9 @@\n                 elif data == \"2FA?\":   \n                     secret = user + password\n                     totp = pyotp.TOTP(\"secret\")\n                     #print(\"Current 2FA code: \" + str(totp.now()))\n-                    var = input(\"Insira o código 2FA\")\n+                    var = totp.now()\n                     auth = \"2FA \" + var\n                     self.socket.sendto(auth.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\\n\")\n"
+                },
+                {
+                    "date": 1658754210925,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -38,10 +38,9 @@\n                 elif data == \"2FA?\":   \n                     secret = user + password\n                     totp = pyotp.TOTP(\"secret\")\n                     #print(\"Current 2FA code: \" + str(totp.now()))\n-                    var = totp.now()\n-                    auth = \"2FA \" + var\n+                    auth = totp.now()\n                     self.socket.sendto(auth.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\\n\")\n                     break\n"
+                },
+                {
+                    "date": 1658754435029,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -36,9 +36,9 @@\n                     msg = \"password \" + password\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"2FA?\":   \n                     secret = user + password\n-                    totp = pyotp.TOTP(\"secret\")\n+                    totp = pyotp.TOTP(base64.b32encode(\"secret\"))\n                     #print(\"Current 2FA code: \" + str(totp.now()))\n                     auth = totp.now()\n                     self.socket.sendto(auth.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n"
+                },
+                {
+                    "date": 1658754449241,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,5 +1,5 @@\n-import sys,os,socket,pyotp\n+import sys,os,socket,pyotp, base64\n \n class SNMPManager():\n     def __init__(self):\n         self.port = 161\n"
+                },
+                {
+                    "date": 1658754473722,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -36,9 +36,9 @@\n                     msg = \"password \" + password\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"2FA?\":   \n                     secret = user + password\n-                    totp = pyotp.TOTP(base64.b32encode(\"secret\"))\n+                    totp = pyotp.TOTP(base64.b32encode(secret))\n                     #print(\"Current 2FA code: \" + str(totp.now()))\n                     auth = totp.now()\n                     self.socket.sendto(auth.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n"
+                },
+                {
+                    "date": 1658754564738,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -35,9 +35,9 @@\n                     os.system('cls' if os.name == 'nt' else 'clear')\n                     msg = \"password \" + password\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"2FA?\":   \n-                    secret = user + password\n+                    secret = str(user + password)\n                     totp = pyotp.TOTP(base64.b32encode(secret))\n                     #print(\"Current 2FA code: \" + str(totp.now()))\n                     auth = totp.now()\n                     self.socket.sendto(auth.encode(), (proxyIP, self.port))\n"
+                },
+                {
+                    "date": 1658754571414,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -34,9 +34,10 @@\n                     password = input(\"Introduza a Password:\\n\")\n                     os.system('cls' if os.name == 'nt' else 'clear')\n                     msg = \"password \" + password\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n-                elif data == \"2FA?\":   \n+                elif data == \"2FA?\": \n+                    print(secret)  \n                     secret = str(user + password)\n                     totp = pyotp.TOTP(base64.b32encode(secret))\n                     #print(\"Current 2FA code: \" + str(totp.now()))\n                     auth = totp.now()\n"
+                },
+                {
+                    "date": 1658754596260,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -35,10 +35,11 @@\n                     os.system('cls' if os.name == 'nt' else 'clear')\n                     msg = \"password \" + password\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"2FA?\": \n-                    print(secret)  \n+                     \n                     secret = str(user + password)\n+                    print(secret) \n                     totp = pyotp.TOTP(base64.b32encode(secret))\n                     #print(\"Current 2FA code: \" + str(totp.now()))\n                     auth = totp.now()\n                     self.socket.sendto(auth.encode(), (proxyIP, self.port))\n"
+                },
+                {
+                    "date": 1658754655317,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -38,9 +38,9 @@\n                 elif data == \"2FA?\": \n                      \n                     secret = str(user + password)\n                     print(secret) \n-                    totp = pyotp.TOTP(base64.b32encode(secret))\n+                    totp = pyotp.TOTP(base64.b32encode(secret.encode()))\n                     #print(\"Current 2FA code: \" + str(totp.now()))\n                     auth = totp.now()\n                     self.socket.sendto(auth.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n"
+                },
+                {
+                    "date": 1658764214612,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,5 +1,6 @@\n import sys,os,socket,pyotp, base64\n+from cryptography.fernet import Fernet\n \n class SNMPManager():\n     def __init__(self):\n         self.port = 161\n"
+                },
+                {
+                    "date": 1658764857576,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,6 +1,6 @@\n import sys,os,socket,pyotp, base64\n-from cryptography.fernet import Fernet\n+from Crypto.Cipher import AES\n \n class SNMPManager():\n     def __init__(self):\n         self.port = 161\n@@ -11,8 +11,18 @@\n         self.proxyIP = \"\"\n         self.login()\n         \n         \n+        \n+    #method to encrypt a message before sending it to the proxy\n+    def encrypt(self, message):\n+        key = Fernet.generate_key()\n+        f = Fernet(key)\n+        encrypted = f.encrypt(message.encode())\n+        return encrypted, ke\n+    \n+        \n+        \n     def login(self):\n         #clear terminal\n         os.system('cls' if os.name == 'nt' else 'clear')\n         print(\"Bem Vindo ao Manager SNMP\")\n"
+                },
+                {
+                    "date": 1658765740055,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,5 +1,5 @@\n-import sys,os,socket,pyotp, base64\n+import sys,os,socket,pyotp, base64, rsa\n from Crypto.Cipher import AES\n \n class SNMPManager():\n     def __init__(self):\n@@ -9,17 +9,14 @@\n         self.socket.bind((self.ip, self.port))\n         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\n         self.proxyIP = \"\"\n         self.login()\n+        self.username = \"\"\n         \n         \n-        \n     #method to encrypt a message before sending it to the proxy\n     def encrypt(self, message):\n-        key = Fernet.generate_key()\n-        f = Fernet(key)\n-        encrypted = f.encrypt(message.encode())\n-        return encrypted, ke\n+        message = \n     \n         \n         \n     def login(self):\n"
+                },
+                {
+                    "date": 1658765751581,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -34,8 +34,9 @@\n             if addr[0] == proxyIP:\n                 data = data.decode() \n                 if data == \"Username?\":\n                     user = input(\"Introduza o Username:\\n\")\n+                    self.username = user\n                     msg = \"username \" + user\n                     os.system('cls' if os.name == 'nt' else 'clear')\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"Password?\":\n"
+                },
+                {
+                    "date": 1658765797803,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -26,16 +26,17 @@\n         #proxyIP = input(\"Introduza o IP do Proxy:\")\n         proxyIP = \"127.0.0.3\"\n         self.proxyIP = proxyIP\n         input(\"Pressione Enter para proceder à autenticação...\")\n+        user = input(\"Introduza o Username:\\n\")\n         os.system('cls' if os.name == 'nt' else 'clear')\n         self.socket.sendto(\"login\".encode(), (proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == proxyIP:\n                 data = data.decode() \n                 if data == \"Username?\":\n-                    user = input(\"Introduza o Username:\\n\")\n+                    \n                     self.username = user\n                     msg = \"username \" + user\n                     os.system('cls' if os.name == 'nt' else 'clear')\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n"
+                },
+                {
+                    "date": 1658765857792,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -10,13 +10,14 @@\n         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\n         self.proxyIP = \"\"\n         self.login()\n         self.username = \"\"\n+        self.privateKey = \"\"\n         \n-        \n     #method to encrypt a message before sending it to the proxy\n     def encrypt(self, message):\n-        message = \n+        msg = message.encode()\n+        encrypted = rsa.encrypt\n     \n         \n         \n     def login(self):\n@@ -34,9 +35,8 @@\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == proxyIP:\n                 data = data.decode() \n                 if data == \"Username?\":\n-                    \n                     self.username = user\n                     msg = \"username \" + user\n                     os.system('cls' if os.name == 'nt' else 'clear')\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n"
+                },
+                {
+                    "date": 1658765881563,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -8,8 +8,9 @@\n         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n         self.socket.bind((self.ip, self.port))\n         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\n         self.proxyIP = \"\"\n+        self.getMyKey()\n         self.login()\n         self.username = \"\"\n         self.privateKey = \"\"\n         \n"
+                },
+                {
+                    "date": 1658765949652,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -8,9 +8,8 @@\n         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n         self.socket.bind((self.ip, self.port))\n         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\n         self.proxyIP = \"\"\n-        self.getMyKey()\n         self.login()\n         self.username = \"\"\n         self.privateKey = \"\"\n         \n@@ -19,9 +18,18 @@\n         msg = message.encode()\n         encrypted = rsa.encrypt\n     \n         \n+    def getPKey(self, message):\n         \n+        #open the keys.py file and load the private key associated with my self.username\n+        \n+        tmpkeys = json.load(open(\"keys.json\"))\n+        \n+        self.privateKey = tmpkeys[self.username][\"privateKey\"]\n+        \n+        \n+        \n     def login(self):\n         #clear terminal\n         os.system('cls' if os.name == 'nt' else 'clear')\n         print(\"Bem Vindo ao Manager SNMP\")\n"
+                },
+                {
+                    "date": 1658765979791,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,5 +1,5 @@\n-import sys,os,socket,pyotp, base64, rsa\n+import sys,os,socket,pyotp, base64, rsa, json\n from Crypto.Cipher import AES\n \n class SNMPManager():\n     def __init__(self):\n@@ -19,17 +19,13 @@\n         encrypted = rsa.encrypt\n     \n         \n     def getPKey(self, message):\n-        \n-        #open the keys.py file and load the private key associated with my self.username\n-        \n+    \n         tmpkeys = json.load(open(\"keys.json\"))\n-        \n         self.privateKey = tmpkeys[self.username][\"privateKey\"]\n         \n         \n-        \n     def login(self):\n         #clear terminal\n         os.system('cls' if os.name == 'nt' else 'clear')\n         print(\"Bem Vindo ao Manager SNMP\")\n@@ -37,16 +33,16 @@\n         proxyIP = \"127.0.0.3\"\n         self.proxyIP = proxyIP\n         input(\"Pressione Enter para proceder à autenticação...\")\n         user = input(\"Introduza o Username:\\n\")\n+        self.username = user\n         os.system('cls' if os.name == 'nt' else 'clear')\n         self.socket.sendto(\"login\".encode(), (proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == proxyIP:\n                 data = data.decode() \n                 if data == \"Username?\":\n-                    self.username = user\n                     msg = \"username \" + user\n                     os.system('cls' if os.name == 'nt' else 'clear')\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"Password?\":\n"
+                },
+                {
+                    "date": 1658765988527,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -34,8 +34,9 @@\n         self.proxyIP = proxyIP\n         input(\"Pressione Enter para proceder à autenticação...\")\n         user = input(\"Introduza o Username:\\n\")\n         self.username = user\n+        self.getPKey()\n         os.system('cls' if os.name == 'nt' else 'clear')\n         self.socket.sendto(\"login\".encode(), (proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n"
+                },
+                {
+                    "date": 1658765997259,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -15,12 +15,12 @@\n         \n     #method to encrypt a message before sending it to the proxy\n     def encrypt(self, message):\n         msg = message.encode()\n-        encrypted = rsa.encrypt\n+        encrypted = rsa.encrypt(msg, self.privateKey)\n     \n         \n-    def getPKey(self, message):\n+    def getPKey(self):\n     \n         tmpkeys = json.load(open(\"keys.json\"))\n         self.privateKey = tmpkeys[self.username][\"privateKey\"]\n         \n"
+                },
+                {
+                    "date": 1658766004185,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -16,8 +16,9 @@\n     #method to encrypt a message before sending it to the proxy\n     def encrypt(self, message):\n         msg = message.encode()\n         encrypted = rsa.encrypt(msg, self.privateKey)\n+        return encrypted\n     \n         \n     def getPKey(self):\n     \n"
+                },
+                {
+                    "date": 1658766458006,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -17,10 +17,9 @@\n     def encrypt(self, message):\n         msg = message.encode()\n         encrypted = rsa.encrypt(msg, self.privateKey)\n         return encrypted\n-    \n-        \n+            \n     def getPKey(self):\n     \n         tmpkeys = json.load(open(\"keys.json\"))\n         self.privateKey = tmpkeys[self.username][\"privateKey\"]\n"
+                },
+                {
+                    "date": 1658766499484,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -11,21 +11,22 @@\n         self.proxyIP = \"\"\n         self.login()\n         self.username = \"\"\n         self.privateKey = \"\"\n+        self.publicKey = \"\"\n         \n     #method to encrypt a message before sending it to the proxy\n     def encrypt(self, message):\n         msg = message.encode()\n         encrypted = rsa.encrypt(msg, self.privateKey)\n         return encrypted\n             \n-    def getPKey(self):\n-    \n-        tmpkeys = json.load(open(\"keys.json\"))\n-        self.privateKey = tmpkeys[self.username][\"privateKey\"]\n+    def getKeys(self):\n+        #open private_key.pem file and load it into privateKey\n         \n         \n+        \n+        \n     def login(self):\n         #clear terminal\n         os.system('cls' if os.name == 'nt' else 'clear')\n         print(\"Bem Vindo ao Manager SNMP\")\n@@ -34,9 +35,8 @@\n         self.proxyIP = proxyIP\n         input(\"Pressione Enter para proceder à autenticação...\")\n         user = input(\"Introduza o Username:\\n\")\n         self.username = user\n-        self.getPKey()\n         os.system('cls' if os.name == 'nt' else 'clear')\n         self.socket.sendto(\"login\".encode(), (proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n"
+                },
+                {
+                    "date": 1658766897467,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -16,17 +16,23 @@\n         \n     #method to encrypt a message before sending it to the proxy\n     def encrypt(self, message):\n         msg = message.encode()\n-        encrypted = rsa.encrypt(msg, self.privateKey)\n+        encrypted = rsa.encrypt(msg, self.publicKey)\n         return encrypted\n+    \n+    def decrypt(self, message):\n+        decoded_msg = rsa.decrypt(message, self.privateKey)\n+        return decoded_msg.decode()\n+        \n             \n     def getKeys(self):\n-        #open private_key.pem file and load it into privateKey\n+        with open(\"private_key.pem\", \"rb\") as f:\n+                self.privateKey = rsa.PrivateKey.load_pkcs1(f.read())\n+        with open(\"public_key.pem\", \"rb\") as f:\n+                self.publicKey = rsa.PublicKey.load_pkcs1(f.read())\n         \n         \n-        \n-        \n     def login(self):\n         #clear terminal\n         os.system('cls' if os.name == 'nt' else 'clear')\n         print(\"Bem Vindo ao Manager SNMP\")\n"
+                },
+                {
+                    "date": 1658767059654,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -42,16 +42,18 @@\n         input(\"Pressione Enter para proceder à autenticação...\")\n         user = input(\"Introduza o Username:\\n\")\n         self.username = user\n         os.system('cls' if os.name == 'nt' else 'clear')\n-        self.socket.sendto(\"login\".encode(), (proxyIP, self.port))\n+        msg =  self.encrypt('login')\n+        self.socket.sendto(msg, (proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == proxyIP:\n                 data = data.decode() \n                 if data == \"Username?\":\n                     msg = \"username \" + user\n                     os.system('cls' if os.name == 'nt' else 'clear')\n+                    msg = self.encrypt(msg)\n                     self.socket.sendto(msg.encode(), (proxyIP, self.port))\n                 elif data == \"Password?\":\n                     password = input(\"Introduza a Password:\\n\")\n                     os.system('cls' if os.name == 'nt' else 'clear')\n"
+                },
+                {
+                    "date": 1658767081876,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -52,14 +52,15 @@\n                 if data == \"Username?\":\n                     msg = \"username \" + user\n                     os.system('cls' if os.name == 'nt' else 'clear')\n                     msg = self.encrypt(msg)\n-                    self.socket.sendto(msg.encode(), (proxyIP, self.port))\n+                    self.socket.sendto(msg, (proxyIP, self.port))\n                 elif data == \"Password?\":\n                     password = input(\"Introduza a Password:\\n\")\n                     os.system('cls' if os.name == 'nt' else 'clear')\n                     msg = \"password \" + password\n-                    self.socket.sendto(msg.encode(), (proxyIP, self.port))\n+                    msg = self.encrypt(msg)\n+                    self.socket.sendto(msg, (proxyIP, self.port))\n                 elif data == \"2FA?\": \n                      \n                     secret = str(user + password)\n                     print(secret) \n"
+                },
+                {
+                    "date": 1658767432560,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -66,8 +66,9 @@\n                     print(secret) \n                     totp = pyotp.TOTP(base64.b32encode(secret.encode()))\n                     #print(\"Current 2FA code: \" + str(totp.now()))\n                     auth = totp.now()\n+                    msg = self.encrypt(\"2FA \" + auth)\n                     self.socket.sendto(auth.encode(), (proxyIP, self.port))\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\\n\")\n                     break\n"
+                },
+                {
+                    "date": 1658767448467,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -66,10 +66,10 @@\n                     print(secret) \n                     totp = pyotp.TOTP(base64.b32encode(secret.encode()))\n                     #print(\"Current 2FA code: \" + str(totp.now()))\n                     auth = totp.now()\n-                    msg = self.encrypt(\"2FA \" + auth)\n-                    self.socket.sendto(auth.encode(), (proxyIP, self.port))\n+                    msg = self.encrypt(auth)\n+                    self.socket.sendto(msg, (proxyIP, self.port))\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\\n\")\n                     break\n         self.waitForCommand()\n"
+                },
+                {
+                    "date": 1658767471260,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -87,8 +87,9 @@\n     def request(self, command):\n         \n         if command == \"exit\":\n             sys.exit()\n+        msg = self.encrypt(command)\n         self.socket.sendto(command.encode(), (self.proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == self.proxyIP:\n"
+                },
+                {
+                    "date": 1658767512616,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -88,9 +88,9 @@\n         \n         if command == \"exit\":\n             sys.exit()\n         msg = self.encrypt(command)\n-        self.socket.sendto(command.encode(), (self.proxyIP, self.port))\n+        self.socket.sendto(msg, (self.proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == self.proxyIP:\n                 data = data.decode()\n@@ -101,8 +101,10 @@\n                     break\n         while True:\n             data, addr = self.socket.recvfrom(4096)\n             response = data.decode()\n+            msg = \"ack\"\n+            msg = self.encrypt(msg)\n             self.socket.sendto(\"ack\".encode(), addr)\n             break\n         print(response)\n         input(\"Press Enter to continue...\")\n"
+                },
+                {
+                    "date": 1658767518918,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -103,9 +103,9 @@\n             data, addr = self.socket.recvfrom(4096)\n             response = data.decode()\n             msg = \"ack\"\n             msg = self.encrypt(msg)\n-            self.socket.sendto(\"ack\".encode(), addr)\n+            self.socket.sendto(msg, addr)\n             break\n         print(response)\n         input(\"Press Enter to continue...\")\n         self.waitForCommand()\n"
+                },
+                {
+                    "date": 1658767535513,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -47,9 +47,9 @@\n         self.socket.sendto(msg, (proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == proxyIP:\n-                data = data.decode() \n+                data = self.decrypt(data) \n                 if data == \"Username?\":\n                     msg = \"username \" + user\n                     os.system('cls' if os.name == 'nt' else 'clear')\n                     msg = self.encrypt(msg)\n"
+                },
+                {
+                    "date": 1658767545838,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -92,9 +92,9 @@\n         self.socket.sendto(msg, (self.proxyIP, self.port))\n         while True:\n             data,addr = self.socket.recvfrom(4096)\n             if addr[0] == self.proxyIP:\n-                data = data.decode()\n+                data = self.decrypt(data)\n                 if data == \"ack\":\n                     break\n                 else:\n                     print(data)\n"
+                },
+                {
+                    "date": 1658767553412,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -100,9 +100,9 @@\n                     print(data)\n                     break\n         while True:\n             data, addr = self.socket.recvfrom(4096)\n-            response = data.decode()\n+            response = self.decrypt(data)\n             msg = \"ack\"\n             msg = self.encrypt(msg)\n             self.socket.sendto(msg, addr)\n             break\n"
+                },
+                {
+                    "date": 1658767626434,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,5 +1,5 @@\n-import sys,os,socket,pyotp, base64, rsa, json\n+import sys,os,socket,pyotp, base64, rsa\n from Crypto.Cipher import AES\n \n class SNMPManager():\n     def __init__(self):\n"
+                },
+                {
+                    "date": 1658767933598,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,7 +1,7 @@\n import sys,os,socket,pyotp, base64, rsa\n-from Crypto.Cipher import AES\n \n+\n class SNMPManager():\n     def __init__(self):\n         self.port = 161\n         self.ip = '127.0.0.4'\n@@ -32,8 +32,9 @@\n                 self.publicKey = rsa.PublicKey.load_pkcs1(f.read())\n         \n         \n     def login(self):\n+        self.getKeys()\n         #clear terminal\n         os.system('cls' if os.name == 'nt' else 'clear')\n         print(\"Bem Vindo ao Manager SNMP\")\n         #proxyIP = input(\"Introduza o IP do Proxy:\")\n"
+                },
+                {
+                    "date": 1658831247470,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,5 +1,5 @@\n-import sys,os,socket,pyotp, base64, rsa\n+import sys,os,socket,pyotp, base64, rsa, threading\n \n \n class SNMPManager():\n     def __init__(self):\n@@ -109,13 +109,45 @@\n             break\n         print(response)\n         input(\"Press Enter to continue...\")\n         self.waitForCommand()\n+     \n+     \n+class Traps(threading.Thread):\n+    def __init__(self, privateKey, publicKey):\n+        threading.Thread.__init__(self)\n+        self.port = 162\n+        self.ip = '127.0.0.4'\n+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n+        self.socket.bind((self.ip, self.port))\n+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\n+        self.privateKey = privateKey\n+        self.publicKey = publicKey\n         \n+    \n+    def encrypt(self, message):\n+        msg = message.encode()\n+        encrypted = rsa.encrypt(msg, self.publicKey)\n+        return encrypted\n+    \n+    def decrypt(self, message):\n+        decoded_msg = rsa.decrypt(message, self.privateKey)\n+        return decoded_msg.decode()\n+    \n+    \n+    \n+    \n+    def run(self):\n+        \n+     \n+        \n def main():\n     sm = SNMPManager()\n     \n     \n+    \n+    \n+    \n if __name__ == \"__main__\":\n     main()\n     #sm = SNMPManager()\n     #sm.login()\n"
+                },
+                {
+                    "date": 1658831263683,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -112,12 +112,13 @@\n         self.waitForCommand()\n      \n      \n class Traps(threading.Thread):\n-    def __init__(self, privateKey, publicKey):\n+    def __init__(self, privateKey, publicKey, proxyIp):\n         threading.Thread.__init__(self)\n         self.port = 162\n         self.ip = '127.0.0.4'\n+        self.proxyIp = proxyIp\n         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n         self.socket.bind((self.ip, self.port))\n         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\n         self.privateKey = privateKey\n"
+                },
+                {
+                    "date": 1658831314618,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -133,13 +133,21 @@\n     def decrypt(self, message):\n         decoded_msg = rsa.decrypt(message, self.privateKey)\n         return decoded_msg.decode()\n     \n-    \n-    \n-    \n     def run(self):\n-        \n+        while True:\n+            data, addr = self.socket.recvfrom(4096)\n+            if addr[0] == self.proxyIp:\n+                try:\n+                    data = self.decrypt(data)\n+                    print(data)\n+                except Exception as e:\n+                    print(e)\n+                    pass\n+            else:\n+                print(data)\n+                        \n      \n         \n def main():\n     sm = SNMPManager()\n"
+                },
+                {
+                    "date": 1658831353749,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -72,8 +72,9 @@\n                     self.socket.sendto(msg, (proxyIP, self.port))\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\\n\")\n                     break\n+        tH = Traps(self.privateKey, self.publicKey, self.proxyIP, self.port)\n         self.waitForCommand()\n         \n     def waitForCommand(self):\n         #clear terminal\n"
+                },
+                {
+                    "date": 1658831360752,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -72,9 +72,10 @@\n                     self.socket.sendto(msg, (proxyIP, self.port))\n                 elif data == \"login-ack\":\n                     print(\"Autenticação concluída\\n\")\n                     break\n-        tH = Traps(self.privateKey, self.publicKey, self.proxyIP, self.port)\n+        tH = Traps(self.privateKey, self.publicKey, self.proxyIP)\n+        tH.start()\n         self.waitForCommand()\n         \n     def waitForCommand(self):\n         #clear terminal\n"
+                },
+                {
+                    "date": 1658831377417,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -136,8 +136,9 @@\n         decoded_msg = rsa.decrypt(message, self.privateKey)\n         return decoded_msg.decode()\n     \n     def run(self):\n+        print(\"Á escuta de traps...\")\n         while True:\n             data, addr = self.socket.recvfrom(4096)\n             if addr[0] == self.proxyIp:\n                 try:\n"
+                },
+                {
+                    "date": 1658831735208,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -142,9 +142,11 @@\n             data, addr = self.socket.recvfrom(4096)\n             if addr[0] == self.proxyIp:\n                 try:\n                     data = self.decrypt(data)\n-                    print(data)\n+                    print('----------------------------------------------------')\n+                    print(data + \"!!!\")\n+                    print('----------------------------------------------------')\n                 except Exception as e:\n                     print(e)\n                     pass\n             else:\n"
+                },
+                {
+                    "date": 1658831768643,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -142,8 +142,9 @@\n             data, addr = self.socket.recvfrom(4096)\n             if addr[0] == self.proxyIp:\n                 try:\n                     data = self.decrypt(data)\n+                    print('\\n')\n                     print('----------------------------------------------------')\n                     print(data + \"!!!\")\n                     print('----------------------------------------------------')\n                 except Exception as e:\n"
+                },
+                {
+                    "date": 1658831777371,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -142,10 +142,9 @@\n             data, addr = self.socket.recvfrom(4096)\n             if addr[0] == self.proxyIp:\n                 try:\n                     data = self.decrypt(data)\n-                    print('\\n')\n-                    print('----------------------------------------------------')\n+                    print('\\n----------------------------------------------------')\n                     print(data + \"!!!\")\n                     print('----------------------------------------------------')\n                 except Exception as e:\n                     print(e)\n"
+                },
+                {
+                    "date": 1658833331714,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -145,8 +145,9 @@\n                     data = self.decrypt(data)\n                     print('\\n----------------------------------------------------')\n                     print(data + \"!!!\")\n                     print('----------------------------------------------------')\n+                    self.socket.sendto(self.encrypt(\"trap-ack\"), (self.proxyIp, self.port))\n                 except Exception as e:\n                     print(e)\n                     pass\n             else:\n"
+                }
+            ],
+            "date": 1658392855750,
+            "name": "Commit-0",
+            "content": ""
+        }
+    ]
+}

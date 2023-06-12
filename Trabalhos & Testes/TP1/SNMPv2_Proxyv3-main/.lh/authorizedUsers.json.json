@@ -1,0 +1,26 @@
+{
+    "sourceFile": "authorizedUsers.json",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 2,
+            "patches": [
+                {
+                    "date": 1658757021623,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1658757032504,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -9,7 +9,8 @@\n     \"adminTestes2\":{\n         \"username\":\"adminTeste\",\n         \"password\":\"password\",\n         \"status\": \"0\",\n-        \"IP\" : \"\"\n+        \"IP\" : \"\",\n+        \"key\" : \"\"\n     }\n }\n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1658765118023,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -3,9 +3,9 @@\n         \"username\":\"adminTeste\",\n         \"password\":\"password\",\n         \"status\": \"0\",\n         \"IP\": \"\",\n-        \"key \": \"\"\n+        \"pKey \": \"\"\n     },\n     \"adminTestes2\":{\n         \"username\":\"adminTeste\",\n         \"password\":\"password\",\n"
+                }
+            ],
+            "date": 1658757021623,
+            "name": "Commit-0",
+            "content": "{\n    \"adminTeste\":{\n        \"username\":\"adminTeste\",\n        \"password\":\"password\",\n        \"status\": \"0\",\n        \"IP\": \"\",\n        \"key \": \"\"\n    },\n    \"adminTestes2\":{\n        \"username\":\"adminTeste\",\n        \"password\":\"password\",\n        \"status\": \"0\",\n        \"IP\" : \"\"\n    }\n}"
+        }
+    ]
+}

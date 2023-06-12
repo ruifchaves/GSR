@@ -14,7 +14,6 @@ class RequestHandler(threading.Thread):
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((self.ip, self.port))
-        self.cstring = cstring
         self.key_matrix = []
 
 
@@ -100,12 +99,11 @@ class RequestHandler(threading.Thread):
 
     def run(self):
         try:
-            while True:        
+            while True:
                 data, addr = self.socket.recvfrom(4096)
                 if addr[1] == self.port: #TODO é necessário fazer a verificação do IP?
-                    dec_pdu = SNMPkeySharePDU.decode(data)
-                    print(data)
-                    print(dec_pdu)
+                    dec_pdu = SNMPkeySharePDU.decode(data.decode())
+
                     if dec_pdu.primitive_type == 1:
                         print("Get request received")
                         self.get_request(data, addr)

@@ -13,12 +13,11 @@ class SNMPManager():
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((self.ip, self.port))
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.waitForCommand(0)
+        self.waitForCommand()
         
         
-    def waitForCommand(self, err):
+    def waitForCommand(self):
         os.system('cls' if os.name == 'nt' else 'clear')
-        if(err == 1): print("Error: Comando inválido\n")
             
         print("---------------------------------------------------------------")
         print("                   Bem Vindo ao SNMPkeyShare                   ")
@@ -28,10 +27,10 @@ class SNMPManager():
         print("snmpkeyshare-set(P,Nw,W)  [e.g. snmpkeyshare-set(55,2,(x,y)(z,j))]")
         print("exit")
         print("---------------------------------------------------------------")
-        command = input("Introduza o comando:")
+        command = input("Introduza o comando: ")
         self.request(command)
     
-
+    # Build PDU from specified command and its parameters
     def build_pdu(self, command):
         try:
             if("get" in command):
@@ -46,45 +45,50 @@ class SNMPManager():
             snd = int(values[1])
             thr = values[2] #TODO dar parse aos pares
 
-            print(thr) #!!DEBUG
-
             pdu = SNMPkeySharePDU(0, 0, [], P, Y, snd, thr, 0, [])
             return pdu
         except:
-            self.waitForCommand(1)
+            print("Invalid Command")
+            input("Press Enter to continue...")
+            self.waitForCommand()
 
 
+    # Check if PDU Request ID is valid (not repeated within timeout period)
     def verify_pdu(self, pdu):
-        P = SNMPkeySharePDU(pdu).request_id
+        P = pdu.request_id
 
         if(P in self.p_time):
             diff_time = time.time() - self.p_time[P]
-            if(diff_time > self.timeout):
+            if(diff_time < self.timeout):
                 return False
 
         self.p_time[P] = time.time()
+        return True
 
+    # Send PDU to agent
     def request(self, command):
         if command == "exit":
             sys.exit()
 
         pdu = self.build_pdu(command)
         if(self.verify_pdu(pdu)):
-            print("PDU válido")
+            print("Valid PDU")
         else: 
-            print("PDU inválido...")
-            time.sleep(2)
-            self.waitForCommand(1)
-        self.socket.sendto(pdu, (self.agentIP, self.port))
-        print("Mensagem enviada")
-
-        input("Press Enter to continue...")
-        self.waitForCommand(0)
-     
+            print(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.")
+            input("Press Enter to continue...")
+            self.waitForCommand()
         
+        print(pdu)
+        pdu_encoded = pdu.encode()
+        self.socket.sendto(pdu_encoded, (self.agentIP, self.port))
+        
+        print("Message sent")
+        input("Press Enter to continue...")
+        self.waitForCommand()
+     
+    
 def main():
     manager = SNMPManager()
-
     
 if __name__ == "__main__":
     main()

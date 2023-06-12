@@ -23,6 +23,7 @@
 
 
 class SNMPkeySharePDU:
+    # PDU Constructor
     def __init__(self, security_model, security_params_num, security_params_list, request_id, primitive_type, num_instances, instances_values, num_errors, errors):
         self.security_model = security_model
         self.security_params_num = security_params_num
@@ -34,10 +35,12 @@ class SNMPkeySharePDU:
         self.num_errors = num_errors
         self.errors = errors
     
+    # Encodes a PDU to a string
     def encode(self):
         pdu_string = f"{self.security_model}\x00{self.security_params_num}\x00{self.security_params_list}\x00{self.request_id}\x00{self.primitive_type}\x00{self.num_instances}\x00{self.instances_values}\x00{self.num_errors}\x00{self.errors}\x00"
         return pdu_string.encode('ascii')
     
+    # Decodes a PDU from a string
     @staticmethod
     def decode(pdu_string):
         pdu_fields = pdu_string.split("\x00")
@@ -54,6 +57,27 @@ class SNMPkeySharePDU:
         return SNMPkeySharePDU(security_model, security_params_num, security_params_list, request_id, primitive_type, num_instances, instances_values, num_errors, errors)
 
 
+    # Returns a string representation of the PDU
+    def __str__(self):
+        primitive_type_str = (
+            "Response" if self.primitive_type == 0 else
+            "Get" if self.primitive_type == 1 else
+            "Set" if self.primitive_type == 2 else
+            "Unknown"
+        )
+        error_list_str = (
+            "No Errors to report" if self.num_errors == 0 else
+            f"""Number of errors   (Nr):     {self.num_errors}
+  Error list         (R):      {self.errors}"""
+        )
+
+        return f"""
+  Request ID         (P):      {self.request_id}
+  Primitive Type     (Y):      {self.primitive_type} ({primitive_type_str})
+  Number of elements (Nl/Nw):  {self.num_instances}
+  Instance list      (L/W):    {self.instances_values}
+  {error_list_str}
+"""
 
 ## Create an SNMPkeySharePDU instance
 #pdu = SNMPkeySharePDU(0, '', 12345, 1, 2, '1\x000\x002\x00', 1, '0\x000\x000\x00')

@@ -1,8 +1,34 @@
+-- snmpKeyShareMib: 1
+--      system: 1
+--          systemRestartDate: 1
+--          systemRestartTime: 2
+--          systemKeySize: 3
+--          systemIntervalUpdate: 4
+--          systemMaxNumberOfKeys: 5
+--          systemKeysTimeToLive: 6
+--      config: 2
+--          configMasterKey: 1
+--          configFirstCharOfKeysAlphabet: 2
+--          configCardinalityOfKeysAlphabet: 3
+--      data: 3
+--          dataNumberOfValidKeys: 1
+--          dataTableGeneratedKeys: 2
+--          dataTableGeneratedKeysEntry: 3
+--              keyId: 1
+--              keyValue: 2
+--              KeyRequester: 3
+--              keyExpirationDate: 4
+--              keyExpirationTime: 5
+--              keyVisibility: 6
+
+
+
+
 -- groups in SNMPKEYSHARE
 -- the OID of snmpKeyShareMib is irrelevant (it can be implemented as NULL)
 snmpKeyShareMib OBJECT IDENTIFIER ::= { }
 
-system OBJECT IDENTIFIER ::= { snmpKeyShareMib 1 }
+system OBJECT IDENTIFIER ::= { snmpKeyShareMib 1 }  -- the system group
 config OBJECT IDENTIFIER ::= { snmpKeyShareMib 2 }
 keys OBJECT IDENTIFIER ::= { snmpKeyShareMib 3 }
 

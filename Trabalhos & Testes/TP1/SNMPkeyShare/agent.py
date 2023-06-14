@@ -1,5 +1,6 @@
 import configparser, os, json, random, threading, socket, sys
 from SNMPkeySharePDU import SNMPkeySharePDU
+from MIB import SNMPKeyShareMIB
 
 MIB = dict()
 mibVals = []
@@ -124,7 +125,7 @@ def main():
     global MIB
     print("A Inicializar agente SNMP...")
     os.system('cls' if os.name == 'nt' else 'clear')                #clear terminal
-    MIB = json.load(open('SNMPkeyShareMIB.json'))
+    MIB = SNMPKeyShareMIB()
     cstring = "public"
     rH = RequestHandler("config.ini", cstring)
     rH.start()

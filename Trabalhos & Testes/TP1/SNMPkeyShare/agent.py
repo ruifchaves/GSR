@@ -69,22 +69,20 @@ class RequestHandler(threading.Thread):
 
 
 
-    def process_request(self, data, addr):
-        dec_pdu = SNMPkeySharePDU.decode(data)
-
-        if(dec_pdu.primitive_type == 1):
-            print(" type received")
-            ret = self.get_request()
-        else :
-            ret = "Invalid SNMP Request"    
-        return ret
+    #def process_request(self, data, addr):
+    #    dec_pdu = SNMPkeySharePDU.decode(data)
+    #    if(dec_pdu.primitive_type == 1):
+    #        print(" type received")
+    #        ret = self.get_request()
+    #    else :
+    #        ret = "Invalid SNMP Request"    
+    #    return ret
     
-    def response(self, data, addr):
-        answer_pdu = SNMPkeySharePDU()
-        answer_pdu = answer_pdu.encode('ascii')
-        response = self.process_request(answer_pdu, addr)
-        self.socket.sendto(response.encode(), addr)
-
+    #def response(self, data, addr):
+    #    answer_pdu = SNMPkeySharePDU()
+    #    answer_pdu = answer_pdu.encode('ascii')
+    #    response = self.process_request(answer_pdu, addr)
+    #    self.socket.sendto(response.encode(), addr)
 
     def get_request(self, dec_pdu, addr):
         pass
@@ -120,6 +118,15 @@ class RequestHandler(threading.Thread):
         except Exception as e:
             print(e)
             sys.exit(1)
+
+
+
+
+
+    def debug(self):
+        json.dump(MIB, open("debug/MIBProxy.json", "w"))
+
+
 
 def main():
     global MIB

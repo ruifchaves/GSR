@@ -28,7 +28,7 @@
 -- the OID of snmpKeyShareMib is irrelevant (it can be implemented as NULL)
 snmpKeyShareMib OBJECT IDENTIFIER ::= { }
 
-system OBJECT IDENTIFIER ::= { snmpKeyShareMib 1 }  -- the system group
+system OBJECT IDENTIFIER ::= { snmpKeyShareMib 1 }
 config OBJECT IDENTIFIER ::= { snmpKeyShareMib 2 }
 keys OBJECT IDENTIFIER ::= { snmpKeyShareMib 3 }
 

@@ -86,13 +86,14 @@
         "STATUS":     "current",
         "DESCRIPTION": "The number of elements in the dataTableGeneratedKeys."
       },
-      "dataTableGeneratedKeys": {
+      "2": {
+        "NAME":       "dataTableGeneratedKeys",
         "SYNTAX":     "SEQUENCE OF DataTableGeneratedKeysEntryType",
         "access":     "not-accessible",
         "STATUS":     "mandatory",
         "DESCRIPTION": "A table with information from all created keys that are still valid."
       },
-      "2": {
+      "3": {
         "1": {
           "NAME":       "keyId",
           "SYNTAX":     "INTEGER",
@@ -108,7 +109,7 @@
           "DESCRIPTION": "The value of a generated key (K bytes/characters long)."
         },
         "3": {
-          "NAME":       "KeyRequester",
+          "NAME":       "keyRequester",
           "SYNTAX":     "OCTET STRING",
           "MAX-ACCESS": "read-only",
           "STATUS":     "current",

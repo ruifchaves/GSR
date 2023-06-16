@@ -1,9 +1,9 @@
-import sys, os, socket, threading, random, time
+import sys, os, socket, threading, random, time, configparser
 from SNMPkeySharePDU import SNMPkeySharePDU
 
 
 class SNMPManager():
-    def __init__(self):
+    def __init__(self, agentIP, V):
         self.timeout = 30 #segundos
         self.p_time = {}
 
@@ -86,9 +86,21 @@ class SNMPManager():
         input("Press Enter to continue...")
         self.waitForCommand()
      
-    
+
+
+
+
+def read_configuration_file(self, config_file):
+    config = configparser.ConfigParser()
+    config.read(config_file)
+    agentIP = self.config['Agent']['agentIP']
+    V = int(self.config['Other']['V'])
+    return [agentIP, V]
+
+
 def main():
-    manager = SNMPManager()
+    config_values = read_configuration_file("config.ini")
+    manager = SNMPManager(config_values[0], config_values[1])
     
 if __name__ == "__main__":
     main()

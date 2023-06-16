@@ -18,7 +18,7 @@
         "0":          ""
       },
       "3": {
-        "NAME":       "systemKeySize",
+        "NAME":       "systemKeySize or K",
         "SYNTAX":     "INTEGER",
         "MAX-ACCESS": "read-write",
         "STATUS":     "current",
@@ -26,7 +26,7 @@
         "0":          ""
       },
       "4": {
-        "NAME":       "systemIntervalUpdate",
+        "NAME":       "systemIntervalUpdate or T",
         "SYNTAX":     "INTEGER",
         "MAX-ACCESS": "read-write",
         "STATUS":     "current",
@@ -34,7 +34,7 @@
         "0":          ""
       },
       "5": {
-        "NAME":       "systemMaxNumberOfKeys",
+        "NAME":       "systemMaxNumberOfKeys or X",
         "SYNTAX":     "INTEGER",
         "MAX-ACCESS": "read-write",
         "STATUS":     "current",
@@ -42,7 +42,7 @@
         "0":          ""
       },
       "6": {
-        "NAME":       "systemKeysTimeToLive",
+        "NAME":       "systemKeysTimeToLive or V",
         "SYNTAX":     "INTEGER",
         "MAX-ACCESS": "read-write",
         "STATUS":     "current",
@@ -53,7 +53,7 @@
 
     "2": {
       "1": {
-        "NAME":       "configMasterKey",
+        "NAME":       "configMasterKey or M",
         "SYNTAX":     "OCTET STRING",
         "MAX-ACCESS": "read-write",
         "STATUS":     "current",
@@ -84,7 +84,8 @@
         "SYNTAX":     "INTEGER",
         "MAX-ACCESS": "read-only",
         "STATUS":     "current",
-        "DESCRIPTION": "The number of elements in the dataTableGeneratedKeys."
+        "DESCRIPTION": "The number of elements in the dataTableGeneratedKeys.",
+        "0":          ""
       },
       "2": {
         "NAME":       "dataTableGeneratedKeys",

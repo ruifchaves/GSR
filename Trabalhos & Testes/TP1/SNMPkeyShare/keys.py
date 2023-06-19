@@ -1,19 +1,26 @@
 import numpy as np
-
+from datetime import datetime, timedelta
+import time, threading
 
 
 update_count = 0
 
 class Keys:
-    def __init__(self, M, K, T):
+    def __init__(self, M, K, T, V):
         if type(M) is str:
             M = np.array([int(c) for c in M])
             #print("M:", M)
         self.M = M
         self.K = K
         self.T = T
+        self.V = V
         self.Z = self.generate_matrix_Z()
         self.update_count = 0
+
+        # Start the cleanup thread
+        cleanup_thread = threading.Thread(target=self.update_matrix_thread, args=(self.T,))
+        cleanup_thread.start()
+
 
     def rotate(self, seq, n):
         return np.roll(seq, n)
@@ -60,21 +67,27 @@ class Keys:
         j = self.random(self.Z[i, 0], 0, self.K - 1)
 
         C = self.xor(self.Z[i], self.transpose(self.Z[:, j]))
-        return C
+        C = ''.join(chr(byte) for byte in C) # Convert to ascii string
+
+        return C, datetime.now() + timedelta(seconds=self.V)
 
 
 
-# Example usage
-#   M = np.random.randint(0, 256, size=(2 * 8,), dtype=np.uint8)
-#   K = 8
-#   T = 1000
 
-#   key_gen = KeyGenerator(M, K, T)
 
-# Update the matrix Z
-#   key_gen.update_matrix_Z()
 
-# Generate a key
-#   key = key_gen.generate_key()
-#   print("Generated key:", key)
+
+
+
+    def update_matrix_thread(self, T):
+        while True:
+            self.update_matrix_Z()
+            time.sleep(T)
+
+
+
+
+
+
+
 

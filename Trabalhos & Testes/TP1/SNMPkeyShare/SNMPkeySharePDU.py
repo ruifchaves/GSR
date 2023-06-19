@@ -37,7 +37,8 @@ class SNMPkeySharePDU:
     
     # Encodes a PDU to a string
     def encode(self):
-        pdu_string = f"{self.security_model}\x00{self.security_params_num}\x00{self.security_params_list}\x00{self.request_id}\x00{self.primitive_type}\x00{self.num_instances}\x00{self.instances_values}\x00{self.num_errors}\x00{self.errors}\x00"
+        instances_values_str = '\x00'.join([f"{instance[0]}\x00{instance[1]}" for instance in self.instances_values])
+        pdu_string = f"{self.security_model}\x00{self.security_params_num}\x00{self.security_params_list}\x00{self.request_id}\x00{self.primitive_type}\x00{self.num_instances}\x00{instances_values_str}\x00{self.num_errors}\x00{self.errors}\x00"
         return pdu_string.encode('ascii')
     
     # Decodes a PDU from a string
@@ -50,9 +51,20 @@ class SNMPkeySharePDU:
         request_id = int(pdu_fields[3])
         primitive_type = int(pdu_fields[4])
         num_instances = int(pdu_fields[5])
-        instances_values = pdu_fields[6]
-        num_errors = int(pdu_fields[7])
-        errors = pdu_fields[8]
+
+
+        # Decode instances_values as a list of tuples
+        instances_values = [
+            (pdu_fields[i], pdu_fields[i+1]) for i in range(6, 6 + num_instances * 2, 2)
+        ]
+        print("instace valueeeeeeeeeeee", instances_values)
+
+        num_errors = int(pdu_fields[6 + num_instances * 2])
+        
+        # Decode errors as a list of tuples
+        errors = [
+            (pdu_fields[i], pdu_fields[i+1]) for i in range(7 + num_instances * 2, 7 + num_instances * 2 + num_errors * 2, 2)
+        ]
         
         return SNMPkeySharePDU(security_model, security_params_num, security_params_list, request_id, primitive_type, num_instances, instances_values, num_errors, errors)
 
@@ -70,12 +82,13 @@ class SNMPkeySharePDU:
             f"""Number of errors   (Nr):     {self.num_errors}
   Error list         (R):      {self.errors}"""
         )
+        instances_values_str = ' '.join([f"({instance[0]}, {instance[1]})" for instance in self.instances_values])
 
         return f"""
   Request ID         (P):      {self.request_id}
   Primitive Type     (Y):      {self.primitive_type} ({primitive_type_str})
   Number of elements (Nl/Nw):  {self.num_instances}
-  Instance list      (L/W):    {self.instances_values}
+  Instance list      (L/W):    {instances_values_str}
   {error_list_str}
 """
 

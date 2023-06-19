@@ -1,15 +1,16 @@
-import sys, os, socket, threading, random, time, configparser
+import sys, os, socket, threading, random, time, configparser, re
 from SNMPkeySharePDU import SNMPkeySharePDU
 
 
 class SNMPManager():
-    def __init__(self, agentIP, V):
-        self.timeout = 30 #segundos
+    def __init__(self, agentIP, snmpport, V):
+        self.timeout = V #segundos
         self.p_time = {}
 
-        self.port = 162
         self.ip = '127.0.0.3'
-        self.agentIP = "127.0.0.2"
+        self.agentIP = agentIP
+        self.port = snmpport
+
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((self.ip, self.port))
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -43,9 +44,12 @@ class SNMPManager():
             values = substring.split(",")
             P = int(values[0])
             snd = int(values[1])
-            thr = values[2] #TODO dar parse aos pares
 
-            pdu = SNMPkeySharePDU(0, 0, [], P, Y, snd, thr, 0, [])
+
+            pairs = re.findall(r'\((\d.\d.\d.(?:\d.)?\d),(\d+)\)', command)
+            tuple_list = [(x, y) for x, y in pairs]
+
+            pdu = SNMPkeySharePDU(0, 0, [], P, Y, snd, tuple_list, 0, [])
             return pdu
         except:
             print("Invalid Command")
@@ -69,20 +73,46 @@ class SNMPManager():
     def request(self, command):
         if command == "exit":
             sys.exit()
+        elif command == "1":
+            command = "snmpkeyshare-get(1,1,(1,1))"        
+        elif command == "2":
+            command = "snmpkeyshare-set(1,1,(1,1))"        
+        elif command == "3":
+            command = "snmpkeyshare-set(1,1,(1.3.3.6.0,2))"
+        elif command == "4":
+            command = "get(2,1,(1.3.3.3.1,3))"
 
-        pdu = self.build_pdu(command)
-        if(self.verify_pdu(pdu)):
-            print("Valid PDU")
-        else: 
-            print(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.")
+        try:
+            pdu = self.build_pdu(command)
+            if(self.verify_pdu(pdu)):
+                print("Valid PDU")
+            else: 
+                print(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.")
+                input("Press Enter to continue...")
+                self.waitForCommand()
+            
+            print(pdu)
+            pdu_encoded = pdu.encode()
+            #print(pdu_encoded)
+            self.socket.sendto(pdu_encoded, (self.agentIP, self.port))
+        except:
+            print("Unable to send Message")
             input("Press Enter to continue...")
             self.waitForCommand()
         
-        print(pdu)
-        pdu_encoded = pdu.encode()
-        self.socket.sendto(pdu_encoded, (self.agentIP, self.port))
-        
         print("Message sent")
+        now = time.time()
+        while time.time() < now + 2:
+            data, addr = self.socket.recvfrom(1024)
+            dec_pdu = SNMPkeySharePDU.decode(data.decode())
+
+            if(data):
+                print("Message received")
+                print(data)
+                print(dec_pdu)
+                break
+
+
         input("Press Enter to continue...")
         self.waitForCommand()
      
@@ -90,17 +120,19 @@ class SNMPManager():
 
 
 
-def read_configuration_file(self, config_file):
+def read_configuration_file(config_file):
+
     config = configparser.ConfigParser()
     config.read(config_file)
-    agentIP = self.config['Agent']['agentIP']
-    V = int(self.config['Other']['V'])
-    return [agentIP, V]
+    agentIP = config['Agent']['ip']
+    snmport = int(config['Agent']['snmpport'])
+    V = int(config['Other']['V'])
+    return [agentIP, snmport, V]
 
 
 def main():
     config_values = read_configuration_file("config.ini")
-    manager = SNMPManager(config_values[0], config_values[1])
+    manager = SNMPManager(config_values[0], config_values[1], config_values[2])
     
 if __name__ == "__main__":
     main()

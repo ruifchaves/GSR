@@ -53,6 +53,9 @@ class SNMPKeyShareMIB:
         keys = oid.split(".")
         return keys
 
+
+
+    # TODO: talvez seja substituido pelo set_value_forN
     def get_value(self, oid):
         keys = self.translateOID(oid)
         mib_dict = None
@@ -79,23 +82,35 @@ class SNMPKeyShareMIB:
 
 
 
+    # TODO teste de new get value a ver se retorna tambem o erro, substituir o get_value pelo new_get_value.
+    # TODO adicionar admin flag para aceder a system e config groups
+    def get_value_forN(self, oid):
+        keys = self.translateOID(oid)
+        mib_dict = None
+        ret = None
+        
+        if keys[1] == "1":
+            mib_dict = self.mib_system
+        elif keys[1] == "2":
+            mib_dict = self.mib_config
+        elif keys[1] == "3":
+            mib_dict = self.mib_data
+        else:
+            print("OID not found")
+            return None
 
-    #def get_next_oids(self, given_oid, n):
-    #    given_parts = given_oid.split('.')
-    #    next_oids = []
-#
-    #    while len(next_oids) < n:
-    #        last_oid = next_oids[-1] if next_oids else given_oid
-    #        parts = last_oid.split('.')
-    #        next_part = str(int(parts[-1]) + 1)
-    #        next_oid = '.'.join(parts[:-1] + [next_part])
-#
-    #        if next_oid.startswith('.'.join(given_parts)):
-    #            next_oids.append(next_oid)
-    #        else:
-    #            break
-    #    return next_oids
+        for key in keys[2:]:
+            if isinstance(mib_dict, dict) and key in mib_dict:
+                mib_dict = mib_dict[key]
+            else:
+                print("OID not found")
+                ret = (oid, -1) #Error 1: OID not found
+                break
+            ret = (oid, mib_dict)
+        return ret
 
+
+    # TODO passar esta funcaio para o agente
     def get_next_oids(self, oid, count):
         result = []
         current_string = oid
@@ -109,7 +124,7 @@ class SNMPKeyShareMIB:
 
         return result
 
-
+    # TODO passar esta funcao para o agente, passar a inline de get_request e usar apenas get_value no agente
     def get_N_values(self, oid, N):
         ret = []
         oids = self.get_next_oids(oid, N)
@@ -136,6 +151,7 @@ class SNMPKeyShareMIB:
         else:
             return False
 
+    # TODO: atualizar esta funcao para ser como a do set_new_value e retornar (oid, value or error). substituir a set_new_value por esta????
     def set_value(self, oid, set_value, admin=False):
         keys = self.translateOID(oid)
         mib_dict = None  # Variable to store the MIB dictionary

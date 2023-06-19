@@ -32,6 +32,28 @@ class RequestHandler(threading.Thread):
 
 
 
+
+
+    # Funcao que divide (IID, valor) em (IID, valor) e (IID, error_code)
+    def sort_errors_from_instance(self, ret):
+        error = []
+        errors_to_remove = []
+        for tuple in ret:
+            oid, value = tuple
+            if value == -1 or value == -2 or value == -3:
+                error.append((oid, str(abs(value))))
+                errors_to_remove.append(tuple)
+
+        for tuple in errors_to_remove:
+            ret.remove(tuple)
+
+        return ret, error
+
+    # Funcao que da valores de oid lexicograficamente seguintes
+
+
+    # Funcao que trata de um pedido do tipo get
+    # get podes fazer de qualquer um
     def get_request(self, dec_pdu, addr):
         ret = []
         for tuple in dec_pdu.instances_values:
@@ -40,7 +62,17 @@ class RequestHandler(threading.Thread):
 
             print(Nl_oid, Nl_value)
             if Nl_oid.startswith("1.3.3."):
+                # TODO:
+                # lista de oids possiveis
+                # iterar por cada um e adicionar get_value a ret
+                #   caso oid = 2.X
+                #       teste de visibilidade = 0 OU
+                #       teste de visibilidade = 1 e addr != addr
+                #           adicionar a ret (oid, -3) nao seja o mesmo addr
+                #       caso contrario adicionar com get_value a ret
+                #   else adicionar com get_value a ret
                 key_id = Nl_oid.split(".")[-1]
+
                 id_addr = self.mib.get_value(f"1.3.3.4.{key_id}")
                 id_visibility = self.mib.get_value(f"1.3.3.6.{key_id}")
                 print(type(id_visibility))
@@ -50,11 +82,14 @@ class RequestHandler(threading.Thread):
                     pass
                 elif id_visibility == 1:
                     if id_addr != addr[0]:
+                        ret += (Nl_oid, -3) #Error 3: Key only visible to 
                         pass
                     else:
                         ret += (self.mib.get_N_values(Nl_oid, Nl_value))
                 else: ret += (self.mib.get_N_values(Nl_oid, Nl_value))
             else:
+                # lista de oids possiveis
+                # iterar por cada um e adicionar get_value a ret
                 ret += (self.mib.get_N_values(Nl_oid, int(Nl_value)))
                 print(ret)
 
@@ -62,6 +97,9 @@ class RequestHandler(threading.Thread):
             print(ret)
                 #TODO Testar deverá ser lista com oids, values em que values podem ser vazios
             if ret:
+                values_set, erros = [], []
+                values_set, erros = self.sort_errors_from_instance(ret)
+
                 print("Sending response message: ", len(ret))
                 answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(ret), ret, 0, [])
                 print(answer_pdu)
@@ -74,20 +112,6 @@ class RequestHandler(threading.Thread):
                     sys.exit(1)
 
 
-    def sort_errors_from_instance(self, ret):
-        error = []
-        errors_to_remove = []
-        for tuple in ret:
-            oid, value = tuple
-            if value == -1 or value == -2:
-                error.append((oid, str(abs(value))))
-                errors_to_remove.append(tuple)
-
-        for tuple in errors_to_remove:
-            ret.remove(tuple)
-
-        return ret, error
-
 
 
     def set_request(self, dec_pdu, addr):
@@ -97,6 +121,7 @@ class RequestHandler(threading.Thread):
             if Nw_oid == "1.3.3.6.0":
                 try:
                     key, key_expiration = self.key.generate_key()
+                    self.key.update_matrix_Z()
 
                     key_exp_date_formatted = key_expiration.year * 104 + key_expiration.month * 102 + key_expiration.day
                     key_exp_time_formatted = key_expiration.hour * 104 + key_expiration.minute * 102 + key_expiration.second
@@ -129,6 +154,14 @@ class RequestHandler(threading.Thread):
                 except Exception as e:
                     print(e, "Error generating key")
                     response = "Invalid SNMP Set Request Syntax"
+            # TODO:
+            # elif  start with 1.3.3.6.X
+            #   testar se 1.3.3.3.X == addr em que se recebeu o pedido
+            #   caso seja alterar
+            # fazer um set_value admin=False e adicionar a ret
+
+
+
             #Caso seja o mesmo ip a fazer 
             #elif Nw_oid == "1.3.3.{other}.0" for other in range(1, 6):
             #    print("Should be 1.3.3.6.0 instance")
@@ -196,6 +229,12 @@ def read_configuration_file(config_file):
         print("Error: M length must be 2K. Check config.ini file.")
         sys.exit(1)
     print(M)
+
+
+
+
+
+#TODO: thread que faz update da matriz
 
 
 

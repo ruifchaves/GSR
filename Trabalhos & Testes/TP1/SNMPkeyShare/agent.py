@@ -41,7 +41,7 @@ class RequestHandler(threading.Thread):
             print(Nl_oid, Nl_value)
             if Nl_oid.startswith("1.3.3."):
                 key_id = Nl_oid.split(".")[-1]
-                id_addr = self.mib.get_value(f"1.3.3.6.{key_id}")
+                id_addr = self.mib.get_value(f"1.3.3.4.{key_id}")
                 id_visibility = self.mib.get_value(f"1.3.3.6.{key_id}")
                 print(type(id_visibility))
                 print(id_addr, addr[0], id_visibility)
@@ -74,12 +74,26 @@ class RequestHandler(threading.Thread):
                     sys.exit(1)
 
 
+    def sort_errors_from_instance(self, ret):
+        error = []
+        errors_to_remove = []
+        for tuple in ret:
+            oid, value = tuple
+            if value == -1 or value == -2:
+                error.append((oid, str(abs(value))))
+                errors_to_remove.append(tuple)
+
+        for tuple in errors_to_remove:
+            ret.remove(tuple)
+
+        return ret, error
+
+
 
     def set_request(self, dec_pdu, addr):
         print(dec_pdu.instances_values)
         for tuple in dec_pdu.instances_values:
             Nw_oid, Nw_value = tuple
-            print(Nw_oid, Nw_value)
             if Nw_oid == "1.3.3.6.0":
                 try:
                     key, key_expiration = self.key.generate_key()
@@ -88,10 +102,19 @@ class RequestHandler(threading.Thread):
                     key_exp_time_formatted = key_expiration.hour * 104 + key_expiration.minute * 102 + key_expiration.second
 
                     ret = self.mib.add_key_entry(key, addr[0], key_exp_date_formatted, key_exp_time_formatted, int(Nw_value))
-                    if ret is not None:  
-                        keyvisibility_oid, value = ret
+                    if ret:  
+                        #keyvisibility_oid, value = ret
+                        #answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, 1, [(keyvisibility_oid, value)], 0, [])
 
-                        answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, 1, [(keyvisibility_oid, value)], 0, [])
+                        values_set, erros = [], []
+                        values_set, erros = self.sort_errors_from_instance(ret)
+
+                        if len(values_set) == 0:
+                            answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, 1, [(0,0)], len(erros), erros)
+                        elif len(erros) == 0:
+                            answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, 1, [(0,0)])
+                        else:
+                            answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, len(erros), erros)
                         print(answer_pdu)
                         enc_answer_pdu = answer_pdu.encode()
 
@@ -104,8 +127,7 @@ class RequestHandler(threading.Thread):
                     else:
                         print("Error adding key to MIB")
                 except Exception as e:
-                    print(e)
-                    print("Error generating key")
+                    print(e, "Error generating key")
                     response = "Invalid SNMP Set Request Syntax"
             #Caso seja o mesmo ip a fazer 
             #elif Nw_oid == "1.3.3.{other}.0" for other in range(1, 6):

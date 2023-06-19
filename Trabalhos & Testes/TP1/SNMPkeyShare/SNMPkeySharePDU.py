@@ -38,8 +38,9 @@ class SNMPkeySharePDU:
     # Encodes a PDU to a string
     def encode(self):
         instances_values_str = '\x00'.join([f"{instance[0]}\x00{instance[1]}" for instance in self.instances_values])
-        pdu_string = f"{self.security_model}\x00{self.security_params_num}\x00{self.security_params_list}\x00{self.request_id}\x00{self.primitive_type}\x00{self.num_instances}\x00{instances_values_str}\x00{self.num_errors}\x00{self.errors}\x00"
-        return pdu_string.encode('ascii')
+        errors_str =           '\x00'.join([f"{err[0]}\x00{err[1]}" for err in self.errors])
+        pdu_string = f"{self.security_model}\x00{self.security_params_num}\x00{self.security_params_list}\x00{self.request_id}\x00{self.primitive_type}\x00{self.num_instances}\x00{instances_values_str}\x00{self.num_errors}\x00{errors_str}\x00"
+        return pdu_string.encode()
     
     # Decodes a PDU from a string
     @staticmethod
@@ -57,7 +58,6 @@ class SNMPkeySharePDU:
         instances_values = [
             (pdu_fields[i], pdu_fields[i+1]) for i in range(6, 6 + num_instances * 2, 2)
         ]
-        print("instace valueeeeeeeeeeee", instances_values)
 
         num_errors = int(pdu_fields[6 + num_instances * 2])
         
@@ -77,12 +77,22 @@ class SNMPkeySharePDU:
             "Set" if self.primitive_type == 2 else
             "Unknown"
         )
-        error_list_str = (
-            "No Errors to report" if self.num_errors == 0 else
-            f"""Number of errors   (Nr):     {self.num_errors}
-  Error list         (R):      {self.errors}"""
-        )
         instances_values_str = ' '.join([f"({instance[0]}, {instance[1]})" for instance in self.instances_values])
+
+        #errors_str = ' '.join([f"({err[0]}, {err[1]})" for err in self.errors])
+        errors_list = [
+            f"({err[0]}, Error {err[1]}: OID not found)" if err[1] == "1" else
+            f"({err[0]}, Error {err[1]}: Value type not supported)" if err[1] == "2" else
+            f"({err[0]}, {err[1]})" for err in self.errors]
+
+        errors_list_str = "\n    ".join(errors_list)
+
+        error_list_str = (
+            f"""Number of errors   (Nr):     {self.num_errors}
+  Error list         (R):      
+    {errors_list_str}""" if self.num_errors != 0 else ""
+        )
+
 
         return f"""
   Request ID         (P):      {self.request_id}

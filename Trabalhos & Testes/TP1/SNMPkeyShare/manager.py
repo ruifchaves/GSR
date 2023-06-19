@@ -93,7 +93,6 @@ class SNMPManager():
             
             print(pdu)
             pdu_encoded = pdu.encode()
-            #print(pdu_encoded)
             self.socket.sendto(pdu_encoded, (self.agentIP, self.port))
         except:
             print("Unable to send Message")

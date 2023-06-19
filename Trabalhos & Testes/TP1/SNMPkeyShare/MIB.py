@@ -48,15 +48,6 @@ class SNMPKeyShareMIB:
         self.V = V
         self.M = M
 
-    def get_config_values(self):
-        return [
-            self.get_value("1.1.3.0"),
-            self.get_value("1.1.4.0"),
-            self.get_value("1.1.5.0"),
-            self.get_value("1.1.6.0"),
-            self.get_value("1.2.1.0")
-        ]
-
     # function to translate oid to value
     def translateOID(self, oid):
         keys = oid.split(".")
@@ -108,8 +99,8 @@ class SNMPKeyShareMIB:
     def get_next_oids(self, oid, count):
         result = []
         current_string = oid
-        possibilities = ["1.1.1.0", "1.1.2.0", "1.1.3.0", "1.1.4.0", "1.1.5.0", "1.1.6.0", "1.2.1.0", "1.2.2.0", "1.2.3.0", "1.3.1.0"]
 
+        # TODO correct for same group 1 and 2; for 3 needs implementation, same keyID instance
         for _ in range(count):
             result.append(current_string)
             parts = current_string.split('.')
@@ -117,7 +108,6 @@ class SNMPKeyShareMIB:
             current_string = '.'.join(parts)
 
         return result
-
 
 
     def get_N_values(self, oid, N):
@@ -192,10 +182,6 @@ class SNMPKeyShareMIB:
     def increase_dataNumberOfValidKeys(self):
         old = self.mib_data["1"]["0"]
         self.mib_data["1"]["0"] = int(old) + 1
-        print(self.mib_data["1"]["0"])
-        #curr_value = self.get_value("1.3.1.0")
-        #new_value = int(curr_value + 1);    #type: ignore
-        #self.set_value("1.3.1.0", new_value, True)
 
     def decrease_dataNumberOfValidKeys(self):
         old = self.mib_data["1"]["0"]
@@ -210,6 +196,7 @@ class SNMPKeyShareMIB:
     def set_new_value(self, oid, set_value):
         keys = self.translateOID(oid)
         mib_dict = self.mib_data[str(keys[2])]
+        ret = None
         
         type_value = mib_dict[str(keys[-2])]["SYNTAX"]      # type: ignore
 
@@ -219,35 +206,37 @@ class SNMPKeyShareMIB:
                     mib_dict = mib_dict[key]
                 else:
                     print("OID not found")
+                    ret = (oid, -1) #Error 1: OID not found
                     break
             mib_dict[keys[-1]] = set_value
+            ret = (oid, set_value)
         else:
             print("OID Syntax not supported")
+            ret = (oid, -2)  #Error 2: Value type not supported
 
         print(f"OID {oid} ->  {self.get_value(oid)}")       
+        return ret
 
 
     def add_key_entry(self, keyValue, keyRequester, keyExpirationDate, keyExpirationTime, keyVisibility):
+        result = []
+        #result = None
 
         keyID = self.get_unused_number()
-
-        #result = [self.translateOID(f"1.3.3.{X}.{keyID}") for X in range(1, 7)]
-        result = None
+        values = [keyID, keyValue, keyRequester, keyExpirationDate, keyExpirationTime, keyVisibility]
+        oids = [(f"1.3.3.{X}.{keyID}") for X in range(1, 7)]
         try:
-            if self.get_value("1.3.1.0") < self.X:
-                self.set_new_value(f"1.3.3.1.{keyID}", keyID)
-                self.set_new_value(f"1.3.3.2.{keyID}", keyValue)
-                self.set_new_value(f"1.3.3.3.{keyID}", keyRequester)
-                self.set_new_value(f"1.3.3.4.{keyID}", keyExpirationDate)
-                self.set_new_value(f"1.3.3.5.{keyID}", keyExpirationTime)
-                self.set_new_value(f"1.3.3.6.{keyID}", keyVisibility)
-                self.increase_dataNumberOfValidKeys()
-                
-                result = f"1.3.3.6.{keyID}", self.get_value(f"1.3.3.6.{keyID}")
+            for oid, value in zip(oids, values):
+                if self.get_value("1.3.1.0") < self.X:
+                    set_or_nah = self.set_new_value(oid, value)
+                    #result = f"1.3.3.6.{keyID}", self.get_value(f"1.3.3.6.{keyID}")
+                    result.append(set_or_nah)
         except:
             print("Error adding key entry")
 
-        if result is not None: self.used_ids.append(keyID)
+        if result: 
+            self.increase_dataNumberOfValidKeys()
+            self.used_ids.append(keyID)
         return result
 
 
@@ -260,29 +249,20 @@ class SNMPKeyShareMIB:
 
 
     def compare_to_datetime(self, keyExpirationDate, keyExpirationTime):
-        # Convert keyExpirationDate to datetime object
-        year = keyExpirationDate // 10000
-        month = (keyExpirationDate % 10000) // 100
-        day = keyExpirationDate % 100
-        expiration_date = datetime.datetime(year, month, day)
-
-        # Convert keyExpirationTime to datetime object
-        hours = keyExpirationTime // 10000
-        minutes = (keyExpirationTime % 10000) // 100
-        seconds = keyExpirationTime % 100
-        expiration_time = datetime.time(hours, minutes, seconds)
-
         # Get current date and time
-        current_datetime = datetime.datetime.now()
+        cur_datetime = datetime.datetime.now()
 
-        # Combine expiration_date and expiration_time into a datetime object
-        expiration_datetime = datetime.datetime.combine(expiration_date, expiration_time)
+        cur_date = cur_datetime.year * 104 + cur_datetime.month * 102 + cur_datetime.day
+        cur_time = cur_datetime.hour * 104 + cur_datetime.minute * 102 + cur_datetime.second
 
         # Compare expiration_datetime to current_datetime
-        if current_datetime < expiration_datetime:
-            return False # Key is still valid
-        else:
+        if keyExpirationDate < cur_date:
             return True # Key has expired
+        elif keyExpirationDate == cur_date and keyExpirationTime < cur_time:
+            return True # Key has expired
+        else:
+            return False # Key is still valid
+
 
     # Functions related to key cleanup
     def clean_expired_thread(self, X):
@@ -292,17 +272,15 @@ class SNMPKeyShareMIB:
 
     def remove_expired_entries(self):
         for X in self.used_ids:
-            print(self.mib_data["3"])
-            print(f"Checking key {X}: {self.used_ids}")
-            keyExpirationDate = self.mib_data["3"]["4"][str(X)]
-            keyExpirationTime = self.mib_data["3"]["5"][str(X)]
+            keyExpirationDate = int(self.mib_data["3"]["4"][str(X)])
+            keyExpirationTime = int(self.mib_data["3"]["5"][str(X)])
+
             if self.compare_to_datetime(keyExpirationDate, keyExpirationTime):
                 for entry in range(1, 7):
-                    print(f"Gonna delete")
-                    print(f"Deleted key {X}: {self.used_ids}")
+                    print(f"Gonna delete key {X}.{entry}")
                     del self.mib_data["3"][str(entry)][f"{X}"]
                 self.decrease_dataNumberOfValidKeys()
                 self.used_ids.remove(X)
-                print(self.mib_data["3"])
             else:
+                print(f"Key {X} is still valid")
                 pass

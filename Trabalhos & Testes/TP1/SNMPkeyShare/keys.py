@@ -12,7 +12,7 @@ class Keys:
             #print("M:", M)
         self.M = M
         self.K = K
-        self.T = T
+        self.T = T/1000 # convert to seconds
         self.V = V
         self.Z = self.generate_matrix_Z()
         self.update_count = 0

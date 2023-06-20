@@ -81,8 +81,13 @@ class SNMPkeySharePDU:
 
         #errors_str = ' '.join([f"({err[0]}, {err[1]})" for err in self.errors])
         errors_list = [
-            f"({err[0]}, Error {err[1]}: OID not found)" if err[1] == "1" else
-            f"({err[0]}, Error {err[1]}: Value type not supported)" if err[1] == "2" else
+            f"({err[0]}, Error {err[1]}: OID not found)" if err[1] == "1" else                              #set/get
+            f"({err[0]}, Error {err[1]}: Value type not supported)" if err[1] == "2" else                   #set
+            f"({err[0]}, Error {err[1]}: Key is not visible)" if err[1] == "3" else                         #get
+            f"({err[0]}, Error {err[1]}: Key is only visible to the requester)" if err[1] == "4" else       #get
+            f"({err[0]}, Error {err[1]}: Instance is not-accessible)" if err[1] == "5" else
+            f"({err[0]}, Error {err[1]}: Belongs to config or system group - Access denied)" if err[1] == "6" else      #get(config) set(system and config)
+            f"({err[0]}, Error {err[1]}: OID is read-only)" if err[1] == "7" else                           #set
             f"({err[0]}, {err[1]})" for err in self.errors]
 
         errors_list_str = "\n    ".join(errors_list)
@@ -101,16 +106,3 @@ class SNMPkeySharePDU:
   Instance list      (L/W):    {instances_values_str}
   {error_list_str}
 """
-
-## Create an SNMPkeySharePDU instance
-#pdu = SNMPkeySharePDU(0, '', 12345, 1, 2, '1\x000\x002\x00', 1, '0\x000\x000\x00')
-
-# Encode the PDU
-#encoded_pdu = pdu.encode()
-#print(encoded_pdu)  # Output: "0\x0012345\x001\x002\x001\x00\x001\x000\x002\x00\x001\x000\x000\x00\x00"
-
-# Decode the PDU
-#decoded_pdu = SNMPkeySharePDU.decode(encoded_pdu)
-#print(decoded_pdu.security_model)  # Output: 0
-#print(decoded_pdu.request_id)  # Output: 12345
-# ... access other fields of the decoded PDU object

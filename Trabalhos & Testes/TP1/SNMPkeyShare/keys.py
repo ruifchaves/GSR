@@ -1,9 +1,7 @@
 import numpy as np
 from datetime import datetime, timedelta
-import time, threading
 
 
-update_count = 0
 
 class Keys:
     def __init__(self, M, K, T, V):
@@ -17,9 +15,7 @@ class Keys:
         self.Z = self.generate_matrix_Z()
         self.update_count = 0
 
-        # Start the cleanup thread
-        cleanup_thread = threading.Thread(target=self.update_matrix_thread, args=(self.T,))
-        cleanup_thread.start()
+
 
 
     def rotate(self, seq, n):
@@ -61,6 +57,7 @@ class Keys:
             self.Z[:, j] = self.rotate(self.Z[:, j], self.random(self.Z[0, j], 0, self.K - 1))
 
         self.update_count += 1
+        return datetime.now()
 
     def generate_key(self):
         i = self.random(self.update_count + self.Z[0, 0], 0, self.K - 1)
@@ -77,12 +74,6 @@ class Keys:
 
 
 
-
-
-    def update_matrix_thread(self, T):
-        while True:
-            self.update_matrix_Z()
-            time.sleep(T)
 
 
 

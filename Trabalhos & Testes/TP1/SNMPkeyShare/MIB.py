@@ -51,6 +51,8 @@ class SNMPKeyShareMIB:
         self.set_value("1.3.1.0", 0,  True)
         print("Initial values set!")
 
+        self.X = X
+
         #Following lines are for testing purposes
         #self.set_value("1.1.1.0", 1)
         #self.set_value("1.2.1.0", M)
@@ -170,7 +172,7 @@ class SNMPKeyShareMIB:
 
     #! Auxiliary function: Spits out available Key ID
     def get_unused_number(self):
-        for i in range(1, 101):
+        for i in range(1, self.X+1):
             if i not in self.used_ids:
                 return i
         return None
@@ -221,7 +223,7 @@ class SNMPKeyShareMIB:
 
 
 
-
+    #! Functions related to timestamp S instance update
     def increment_timestamp_thread(self, seconds):
         while True:
             time.sleep(seconds)

@@ -28,7 +28,12 @@ class RequestHandler(threading.Thread):
         self.mib = mib
 
 
-
+        self.get_next_oids("1.3.1.0", 9)
+        self.get_next_oids("1.3.1.0", 1)
+        self.get_next_oids("1.3.3.1.0", 1)
+        self.get_next_oids("1.3.3.1.0", 9)
+        self.get_next_oids("1.3.3.1.2", 1)
+        self.get_next_oids("1.3.3.1.4", 9)
 
 
 
@@ -61,9 +66,8 @@ class RequestHandler(threading.Thread):
                 answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, len(erros), erros)
             print(answer_pdu)
             enc_answer_pdu = answer_pdu.encode()
-            print(enc_answer_pdu)
             try:
-                print("Sending response message: ", len(ret))
+                print("Sending response message")
                 self.socket.sendto(enc_answer_pdu, addr)
             except Exception as e:
                 print("Unable to send Response Message: ", e)
@@ -84,45 +88,57 @@ class RequestHandler(threading.Thread):
         current_string = oid
         keys = oid.split(".")
         used_ids_store = self.mib.used_ids
+        used_ids_store = [3,4]
 
         #If you send an SNMP GETNEXT request with an OID that does not exist in the MIB, the SNMP agent will not gather the following OID values lexically.
         #The SNMP agent will respond with an SNMP error, specifically an "End of MIB View" error (SNMPv2c) or "noSuchObject" error (SNMPv1). This indicates that the requested OID does not exist or that there are no further OIDs available in the MIB that are lexicographically greater than the given OID.
         #In such a case, the SNMP agent will not gather or return any OID values beyond the non-existent OID. The SNMP manager will receive the error response and handle it accordingly.
         oid_value = self.mib.get_value(oid, admin=True)
-        if oid_value[1] == -1:
-            return (oid, -1)
+        #if oid_value[1] == -2:
+        #    print(-2)
+        #    return -2                                                            #Error 2: OID does not exist
                 
         if len(keys) == 4 and oid != "1.3.1.0":
+            result.append(current_string)
             for _ in range(count):
                 parts = current_string.split('.')
                 parts[-2] = str(int(parts[-2]) + 1)
                 current_string = '.'.join(parts)
                 result.append(current_string)
-                if len(result) == count:  # Check if desired count is reached
+                if len(result) == count +1:  # Check if desired count is reached
                     break
             result = [item for item in result if item in possible_oids]
         elif oid == "1.3.1.0" or len(keys) == 5:
             if oid == "1.3.1.0":
+                result.append(current_string)  # Include the given OID in the result list
                 current_string = "1.3.3.1.0"
-            for _ in range(count):
+            cur_len_size = count - len(result)
+            if int(current_string.split('.')[-1]) in used_ids_store:
+                id_index = used_ids_store.index(int(current_string.split('.')[-1]))
+            else:
+                id_index = 0
+            for _ in range(cur_len_size):
                 for usedid in used_ids_store:
-                    if len(result) == count:  # Check if desired count is reached
+                    if len(result) == cur_len_size:  # Check if desired count is reached
                         break
                     parts = current_string.split('.')
-                    parts[-1] = str(usedid)
+                    parts[-1] = str(used_ids_store[id_index])
                     result.append('.'.join(parts))
-                    if len(result) == count:  # Check if desired count is reached
+                    id_index = (id_index + 1) % len(used_ids_store)  # Increment index and wrap around if needed
+                    if len(result) == cur_len_size:  # Check if desired count is reached
                         break
                 parts = current_string.split('.')
                 parts[-2] = str(int(parts[-2]) + 1)
                 current_string = '.'.join(parts)
                 
-                if len(result) == count:  # Check if desired count is reached
+                if len(result) == cur_len_size:  # Check if desired count is reached
                     break
-            
+            result = [item for item in result if not item.endswith('.7.1') and int(item.split('.')[-2]) < 7]
+
         if result == []:
-            return [(oid, -10)]                                                             #Error 10: No more OIDs past the given one (endOfMIBView)
-        print(result)
+            print(-10)
+            return -10                                                             #Error 10: No more OIDs past the given one (endOfMIBView)
+        print("list oids: ",result)
         return result
 
 
@@ -136,23 +152,29 @@ class RequestHandler(threading.Thread):
             L_value = int(L_value)
 
             oids = self.get_next_oids(L_oid, L_value)
-            for i in oids:
-                if L_oid.startswith("1.3.3.2."):
-                    key_id = L_oid.split(".")[-1]
+            print(oids)
+            if oids != -2 and oids != -10:
+                for oid in oids:
+                    if oid.startswith("1.3.3.2."):   # type: ignore
+                        key_id = oid.split(".")[-1]
 
-                    id_addr = self.mib.get_value(f"1.3.3.4.{key_id}")[1]
-                    id_visibility = self.mib.get_value(f"1.3.3.6.{key_id}")[1]
-                    print(id_addr, addr[0], id_visibility)
+                        id_addr = self.mib.get_value(f"1.3.3.4.{key_id}")[1]
+                        id_visibility = self.mib.get_value(f"1.3.3.6.{key_id}")[1]
+                        print(id_addr, addr[0], id_visibility)
 
-                    if id_visibility == 0:
-                        ret.append((1, -8))                                  #Error 8: Key is not visible
-                    elif id_visibility == 1 and id_addr != addr[0]:
-                        ret.append((1, -9))                                  #Error 9: Key is not visible to this address
+                        if id_visibility == 0:
+                            ret.append((1, -8))                                                 #Error 8: Key is not visible
+                        elif id_visibility == 1 and id_addr != addr[0]:
+                            ret.append((1, -9))                                                 #Error 9: Key is not visible to this address
+                        else:
+                            ret.append(self.mib.get_value(oid))
                     else:
-                        ret.append(self.mib.get_value(i))
-                else:
-                    ret.append(self.mib.get_value(i))
-                print(ret)
+                        ret.append(self.mib.get_value(oid))
+            elif oids == -2:
+                ret.append((L_oid, -2))
+            elif oids == -10:
+                ret.append((L_oid, -10))
+
 
 
         #TODO Testar deverá ser lista com oids, values em que values podem ser vazios

@@ -80,7 +80,9 @@ class SNMPManager():
         elif command == "3":
             command = "snmpkeyshare-set(1,1,(1.3.3.6.0,2))"
         elif command == "4":
-            command = "get(2,1,(1.3.3.3.1,3))"
+            command = "get(2,1,(1.3.3.3.1,3))"        
+        elif command == "5":
+            command = "get(2,1,(1.3.3.3.1,1))"
 
         try:
             pdu = self.build_pdu(command)

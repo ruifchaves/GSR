@@ -9,7 +9,7 @@ class SNMPKeyShareMIB:
         self.mib_system = dict()
         self.mib_config = dict()
         self.mib_data = dict()
-        self.used_ids = [X]
+        self.used_ids = []
 
         # ii. Manter um objeto de gestão que indique (em segundos) há quanto tempo o agente
         #     iniciou/reiniciou a sua execução (timespamp S);
@@ -203,6 +203,7 @@ class SNMPKeyShareMIB:
 
     def remove_expired_entries(self):
         for id in self.used_ids:
+            print(f"Checking key {id}")
             keyExpirationDate = int(self.mib_data["3"]["4"][str(id)])
             keyExpirationTime = int(self.mib_data["3"]["5"][str(id)])
 

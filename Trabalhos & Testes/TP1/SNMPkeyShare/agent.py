@@ -27,22 +27,26 @@ class RequestHandler(threading.Thread):
         self.keys = keys
         self.mib = mib
 
+        self.get_next_oids("1.1.1.0", 8)
+        self.get_next_oids("1.1.1.0", 8)
+        self.get_next_oids("1.2.1.0", 8)
+        self.get_next_oids("1.3.1.0", 8)
+        self.get_next_oids("1.3.3.1.0", 8)
+
+
+    
 
 
 
 
 
-
-
-
-
-    def send_response(self, P, L, R)
-        try:
-            print(pdu)
-            pdu_encoded = pdu.encode()
-            self.socket.sendto(pdu_encoded, (self.agentIP, self.port))
-        except:
-            print("Unable to send Response Message")
+    def send_response(self, P, L, R):
+        #try:
+        #    print(pdu)
+        #    pdu_encoded = pdu.encode()
+        #    self.socket.sendto(pdu_encoded, (self.agentIP, self.port))
+        #except:
+        #    print("Unable to send Response Message")
         pass
 
     #! Funcoes auxiliares que permitem tratar pedidos devidamente
@@ -66,17 +70,46 @@ class RequestHandler(threading.Thread):
     def get_next_oids(self, oid, count):
         result = []
         current_string = oid
+        keys = oid.split(".")
+        used_ids_store = self.mib.used_ids
+        #used_ids_store = [4,2,3]
 
-        # TODO same keyID instance or same intance but next keyID?
-        # TODO pelos vistos comeca na instancia a seguir
-        for _ in range(count):
-            result.append(current_string)
-            parts = current_string.split('.')
-            parts[-2] = str(int(parts[-2]) + 1)
-            current_string = '.'.join(parts)
-
+        #If you send an SNMP GETNEXT request with an OID that does not exist in the MIB, the SNMP agent will not gather the following OID values lexically.
+        #The SNMP agent will respond with an SNMP error, specifically an "End of MIB View" error (SNMPv2c) or "noSuchObject" error (SNMPv1). This indicates that the requested OID does not exist or that there are no further OIDs available in the MIB that are lexicographically greater than the given OID.
+        #In such a case, the SNMP agent will not gather or return any OID values beyond the non-existent OID. The SNMP manager will receive the error response and handle it accordingly.
+        oid_value = self.mib.get_value(oid, admin=True)
+        if oid_value[1] == -1:
+            return (oid, -1)
+                
+        if len(keys) == 4 and oid != "1.3.1.0":
+            for _ in range(count):
+                parts = current_string.split('.')
+                parts[-2] = str(int(parts[-2]) + 1)
+                current_string = '.'.join(parts)
+                result.append(current_string)
+                if len(result) == count:  # Check if desired count is reached
+                    break
+        elif oid == "1.3.1.0" or len(keys) == 5:
+            if oid == "1.3.1.0":
+                current_string = "1.3.3.1.0"
+            for _ in range(count):
+                for usedid in used_ids_store:
+                    if len(result) == count:  # Check if desired count is reached
+                        break
+                    parts = current_string.split('.')
+                    parts[-1] = str(usedid)
+                    result.append('.'.join(parts))
+                    if len(result) == count:  # Check if desired count is reached
+                        break
+                parts = current_string.split('.')
+                parts[-2] = str(int(parts[-2]) + 1)
+                current_string = '.'.join(parts)
+                
+                if len(result) == count:  # Check if desired count is reached
+                    break
+        #TODO - Verificar se result = [] e retornar erro
+        print(result)
         return result
-
 
 
     #! Funcao que trata de um pedido do tipo get
@@ -131,13 +164,13 @@ class RequestHandler(threading.Thread):
 
     def add_key_entry(self, keyValue, keyRequester, keyExpirationDate, keyExpirationTime, keyVisibility):
         result = []
-
+        print("teste")
         keyID = self.mib.get_unused_number()
         values = [keyID, keyValue, keyRequester, keyExpirationDate, keyExpirationTime, keyVisibility]
-        oids = [(f"1.3.3.{X}.{keyID}") for X in range(1, 7)]
+        oids = [(f"1.3.3.{X}.{keyID}") for inst in range(1, 7)]
         #try:
         for oid, value in zip(oids, values):
-            if int(self.mib.get_value("1.3.1.0")[1]) < self.X:                       #type: ignore
+            if int(self.mib.get_value("1.3.1.0")[1]) < X:                       #type: ignore
                 set_or_nah = self.mib.set_value(oid, value, admin=True)
                 result.append(set_or_nah)
             else:
@@ -145,6 +178,7 @@ class RequestHandler(threading.Thread):
         #except Exception as e:
         #    print(e, "Error adding key entry")
         #    return result
+        print("teste")
 
         if result: 
             new_value = int(self.mib.get_value("1.3.1.0", True)[1]) + 1

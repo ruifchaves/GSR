@@ -20,7 +20,7 @@
       "3": {
         "NAME":       "systemKeySize or K",
         "SYNTAX":     "INTEGER",
-        "MAX-ACCESS": "read-write",
+        "MAX-ACCESS": "read-only",
         "STATUS":     "current",
         "DESCRIPTION": "The number of bytes (K) of each generated key.",
         "0":          ""
@@ -28,7 +28,7 @@
       "4": {
         "NAME":       "systemIntervalUpdate or T",
         "SYNTAX":     "INTEGER",
-        "MAX-ACCESS": "read-write",
+        "MAX-ACCESS": "read-only",
         "STATUS":     "current",
         "DESCRIPTION": "The number of milliseconds of the updating interval of the internal Z matrix.",
         "0":          ""
@@ -36,7 +36,7 @@
       "5": {
         "NAME":       "systemMaxNumberOfKeys or X",
         "SYNTAX":     "INTEGER",
-        "MAX-ACCESS": "read-write",
+        "MAX-ACCESS": "read-only",
         "STATUS":     "current",
         "DESCRIPTION": "The maximum number of generated keys that are still valid.",
         "0":          ""
@@ -44,7 +44,7 @@
       "6": {
         "NAME":       "systemKeysTimeToLive or V",
         "SYNTAX":     "INTEGER",
-        "MAX-ACCESS": "read-write",
+        "MAX-ACCESS": "read-only",
         "STATUS":     "current",
         "DESCRIPTION": "The number of seconds of the TTL of the generated keys.",
         "0":          ""
@@ -55,7 +55,7 @@
       "1": {
         "NAME":       "configMasterKey or M",
         "SYNTAX":     "OCTET STRING",
-        "MAX-ACCESS": "read-write",
+        "MAX-ACCESS": "not-accessible",
         "STATUS":     "current",
         "DESCRIPTION": "The master double key M with at least K*2 bytes in size.",
         "0":          ""
@@ -63,7 +63,7 @@
       "2": {
         "NAME":       "configFirstCharOfKeysAlphabet",
         "SYNTAX":     "INTEGER",
-        "MAX-ACCESS": "read-write",
+        "MAX-ACCESS": "not-accessible",
         "STATUS":     "current",
         "DESCRIPTION": "The ASCII code of the first character of the alphabet used in the keys (default=33).",
         "0":          ""
@@ -71,7 +71,7 @@
       "3": {
         "NAME":       "configCardinalityOfKeysAlphabet",
         "SYNTAX":     "INTEGER",
-        "MAX-ACCESS": "read-write",
+        "MAX-ACCESS": "not-accessible",
         "STATUS":     "current",
         "DESCRIPTION": "The number of characters (Y) in the alphabet used in the keys (default=94).",
         "0":          ""

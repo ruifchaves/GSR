@@ -75,21 +75,23 @@ class SNMPkeySharePDU:
             "Response" if self.primitive_type == 0 else
             "Get" if self.primitive_type == 1 else
             "Set" if self.primitive_type == 2 else
-            "Unknown"
-        )
+            "Unknown")
+
         instances_values_str = ' '.join([f"({instance[0]}, {instance[1]})" for instance in self.instances_values])
 
-        #errors_str = ' '.join([f"({err[0]}, {err[1]})" for err in self.errors])
         errors_list = [
-            f"({err[0]}, Error {err[1]}: OID not found)" if err[1] == "1" else                              #set/get
-            f"({err[0]}, Error {err[1]}: Value type not supported)" if err[1] == "2" else                   #set
-            f"({err[0]}, Error {err[1]}: Key is not visible)" if err[1] == "3" else                         #get
-            f"({err[0]}, Error {err[1]}: Key is only visible to the requester)" if err[1] == "4" else       #get
-            f"({err[0]}, Error {err[1]}: Instance is not-accessible)" if err[1] == "5" else
-            f"({err[0]}, Error {err[1]}: Belongs to config or system group - Access denied)" if err[1] == "6" else      #get(config) set(system and config)
-            f"({err[0]}, Error {err[1]}: OID is read-only)" if err[1] == "7" else                           #set
-            f"({err[0]}, {err[1]})" for err in self.errors]
-
+            f"({err[0]}, {err[1]}: noError)"      if err[1] == "0" else 
+            f"({err[0]}, Error {err[1]}: tooBig)"       if err[1] == "1" else 
+            f"({err[0]}, Error {err[1]}: noSuchName)"   if err[1] == "2" else
+            f"({err[0]}, Error {err[1]}: badValue)"     if err[1] == "3" else
+            f"({err[0]}, Error {err[1]}: readOnly)"     if err[1] == "4" else
+            f"({err[0]}, Error {err[1]}: genErr)"       if err[1] == "5" else
+            f"({err[0]}, Error {err[1]}: noAccess)"     if err[1] == "6" else
+            f"({err[0]}, Error {err[1]}: wrongType)"    if err[1] == "7" else
+            f"({err[0]}, Error {err[1]}: Key value is not visible)" if err[1] == "8" else
+            f"({err[0]}, Error {err[1]}: Key value is only visible to the requester)" if err[1] == "9" else
+            f"({err[0]}, {err[1]})" 
+            for err in self.errors]
         errors_list_str = "\n    ".join(errors_list)
 
         error_list_str = (

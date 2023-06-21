@@ -49,7 +49,7 @@ class SNMPManager():
             pairs = re.findall(r'\((\d.\d.\d.(?:\d.)?\d),(\d+)\)', command)
             tuple_list = [(x, y) for x, y in pairs]
 
-            pdu = SNMPkeySharePDU(0, 0, [], P, Y, snd, tuple_list, 0, [])
+            pdu = SNMPkeySharePDU(0, 0, [], P, Y, snd, tuple_list, 0, [])                    #type: ignore
             return pdu
         except:
             print("Invalid Command")

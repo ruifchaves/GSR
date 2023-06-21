@@ -34,17 +34,29 @@ class SNMPKeyShareMIB:
     # function to update initial values  #TODO: isto é preciso????
     def set_initial_values(self, K, T, X, V, M):
         init_oids = []
-        self.set_value("1.1.1.0", 1, True)
-        self.set_value("1.1.2.0", 2, True)
-        self.set_value("1.1.3.0", K, True)
-        self.set_value("1.1.4.0", T, True)
-        self.set_value("1.1.5.0", X, True)
-        self.set_value("1.1.6.0", V, True)
-        self.set_value("1.2.1.0", M, True)
+        self.set_value("1.1.1.0", 1,  True)
+        self.set_value("1.1.2.0", 2,  True)
+        self.set_value("1.1.3.0", K,  True)
+        self.set_value("1.1.4.0", T,  True)
+        self.set_value("1.1.5.0", X,  True)
+        self.set_value("1.1.6.0", V,  True)
+        self.set_value("1.2.1.0", M,  True)
         self.set_value("1.2.2.0", 33, True)
         self.set_value("1.2.3.0", 94, True)
-        self.set_value("1.3.1.0", 0, True)
+        self.set_value("1.3.1.0", 0,  True)
 
+        #Following lines are for testing purposes
+        #self.set_value("1.1.1.0", 1)
+        #self.set_value("1.2.1.0", M)
+        #self.set_value("1.3.1.0", 0)
+
+        #print(self.get_value("1.1.1.0", True))
+        #print(self.get_value("1.2.1.0", True))
+        #print(self.get_value("1.3.1.0", True))
+
+        #print(self.get_value("1.1.1.0"))
+        #print(self.get_value("1.2.1.0"))
+        #print(self.get_value("1.3.1.0"))
 
 
     # function to translate oid to value
@@ -63,36 +75,29 @@ class SNMPKeyShareMIB:
         
         if keys[1] == "1":
             mib_dict = self.mib_system
-        elif keys[1] == "2" and admin:
+        elif keys[1] == "2":
             mib_dict = self.mib_config
-        elif keys[1] == "2" and not admin:
-            return (oid, -6)                                        #Error 6: Belongs to config group - Access denied
         elif keys[1] == "3" and len(keys) == 4:
             mib_dict = self.mib_data        
         elif keys[1] == "3" and len(keys) == 5:
             mib_dict = self.mib_data[str(keys[1])]
         else:
-            print("OID not found")                                  #Error 1: OID not found
-            return (oid, -1)
+            print("OID not found")                                  
+            return (oid, -2)                                                #Error 2: OID not found (noSuchName)        
 
-        max_access = mib_dict[str(keys[-2])]["MAX-ACCESS"]          #type: ignore
+        max_access = mib_dict[str(keys[-2])]["MAX-ACCESS"] #type: ignore
 
-        if max_access == "not-accessible":
-            print("OID not accessible")                             #Error 5: OID not accessible
-            return (oid, -5)
+        if max_access == "not-accessible" and not admin:
+            print("OID not accessible")                                     
+            return (oid, -6)                                                #Error 6: OID not accessible (noAccess)
         else:
             for key in keys[(2 if len(keys)==4 else 3):]:
                 if isinstance(mib_dict, dict) and key in mib_dict:
                     mib_dict = mib_dict[key]
                 else:
                     print("OID not found")
-                    ret = (oid, -1)                                 #Error 1: OID not found
-                    break
-                ret = (oid, mib_dict)
-        return ret
-
-
-
+                    return (oid, -2)                                        #Error 2: OID not found (noSuchName)
+            return (oid, mib_dict)
 
 
     #! Set value and auxiliar function
@@ -111,52 +116,42 @@ class SNMPKeyShareMIB:
         mib_dict = None
         ret = None
 
-        if keys[1] == "1" and admin:
+        if keys[1] == "1":
             mib_dict = self.mib_system
-        elif keys[1] == "1" and not admin:
-            return (oid, -6)                                        #Error 6: Belongs to system group - Access denied
-        elif keys[1] == "2" and admin:
+        elif keys[1] == "2":
             mib_dict = self.mib_config
-        elif keys[1] == "2" and not admin:
-            return (oid, -6)                                        #Error 6: Belongs to config group - Access denied
         elif keys[1] == "3" and len(keys) == 4:
             mib_dict = self.mib_data        
         elif keys[1] == "3" and len(keys) == 5:
             mib_dict = self.mib_data[str(keys[1])]
         else:
             print("OID not found")
-            return (oid, -1)                                        #Error 1: OID not found
+            return (oid, -2)                                                #Error 2: OID not found (noSuchName)
 
-        max_access = mib_dict[str(keys[-2])]["MAX-ACCESS"]          #type: ignore
-        type_value = mib_dict[str(keys[-2])]["SYNTAX"]              #type: ignore
+        max_access = mib_dict[str(keys[-2])]["MAX-ACCESS"] #type: ignore
+        type_value = mib_dict[str(keys[-2])]["SYNTAX"]     #type: ignore
 
-        if max_access == "read-only" and admin == False:
+        if max_access == "read-only" and not admin:
             print("OID is read-only")
-            print((oid, -7))
-            return (oid, -7)                                        #Error 7: OID is read-only
-        elif max_access == "not-accessible":
-            print("OID not accessible")                             #Error 5: OID not accessible
-            print((oid, -5))
-            return (oid, -5)
-        elif max_access == "read-write" or admin == True:
+            return (oid, -7)                                                #Error 4: OID is read-only (wrongType)
+        elif max_access == "not-accessible" and not admin:
+            print("OID not accessible")                                     
+            return (oid, -6)                                                #Error 6: OID not accessible (noAccess)
+        elif max_access == "read-write" or admin:
             if self.check_type(set_value, type_value):
                 for key in keys[(2 if len(keys)==4 else 3):-1]:
                     if isinstance(mib_dict, dict) and key in mib_dict:
                         mib_dict = mib_dict[key]
-                    #elif new_key:
-                    #    mib_dict[keys[-1]] = {}
-                    #    print(mib_dict[keys[-1]])
                     else:
                         print("OID not found")
-                        print((oid, -1))
-                        return (oid, -1)                            #Error 1: OID not found
+                        return (oid, -2)                                    #Error 2: OID not found (noSuchName)
+                    
                     mib_dict[keys[-1]] = set_value
-                    print(f"OID {oid} ->  {self.get_value(oid, True)}")
-                    return (oid, self.get_value(oid, True)[1])      #type: ignore
+                    print(f"{oid} -> {self.get_value(oid, admin=True)}")
+                    return (oid, self.get_value(oid, True)[1]) #type: ignore
             else:
                 print("OID Syntax not supported")
-                print((oid, -2))
-                return (oid, -2)                                    #Error 2: Value type not supported
+                return (oid, -3)                                            #Error 3: Value type not supported (badValue)
         
 
 

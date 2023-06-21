@@ -27,17 +27,6 @@ class RequestHandler(threading.Thread):
         self.keys = keys
         self.mib = mib
 
-        self.get_next_oids("1.1.1.0", 8)
-        self.get_next_oids("1.1.1.0", 8)
-        self.get_next_oids("1.2.1.0", 8)
-        self.get_next_oids("1.3.1.0", 8)
-        self.get_next_oids("1.3.3.1.0", 8)
-
-
-    
-
-
-
 
 
     def send_response(self, P, L, R):
@@ -56,7 +45,7 @@ class RequestHandler(threading.Thread):
         errors_to_remove = []
         for tuple in ret:
             oid, value = tuple
-            if value in [-1, -2, -3, -4, -5, -6, -7]:
+            if isinstance(value, int) and value < 0:
                 error.append((oid, str(abs(value))))
                 errors_to_remove.append(tuple)
 
@@ -66,13 +55,13 @@ class RequestHandler(threading.Thread):
         return ret, error
 
 
-    # Funcao auxiliar que retorna lista de oids lexicograficamente seguintes (apenas do mesmo grupo e keyID)
+    # Funcao auxiliar que retorna lista de oids lexicograficamente seguintes (apenas do mesmo grupo - system, config or data)
     def get_next_oids(self, oid, count):
+        possible_oids = ["1.1.1.0", "1.1.2.0", "1.1.3.0", "1.1.4.0", "1.1.5.0", "1.1.6.0", "1.2.1.0", "1.2.2.0", "1.2.3.0"]         #hardcoded but best pratice to maintain SNMP resemblence
         result = []
         current_string = oid
         keys = oid.split(".")
         used_ids_store = self.mib.used_ids
-        #used_ids_store = [4,2,3]
 
         #If you send an SNMP GETNEXT request with an OID that does not exist in the MIB, the SNMP agent will not gather the following OID values lexically.
         #The SNMP agent will respond with an SNMP error, specifically an "End of MIB View" error (SNMPv2c) or "noSuchObject" error (SNMPv1). This indicates that the requested OID does not exist or that there are no further OIDs available in the MIB that are lexicographically greater than the given OID.
@@ -89,6 +78,7 @@ class RequestHandler(threading.Thread):
                 result.append(current_string)
                 if len(result) == count:  # Check if desired count is reached
                     break
+            result = [item for item in result if item in possible_oids]
         elif oid == "1.3.1.0" or len(keys) == 5:
             if oid == "1.3.1.0":
                 current_string = "1.3.3.1.0"
@@ -107,6 +97,7 @@ class RequestHandler(threading.Thread):
                 
                 if len(result) == count:  # Check if desired count is reached
                     break
+            
         #TODO - Verificar se result = [] e retornar erro
         print(result)
         return result
@@ -131,9 +122,9 @@ class RequestHandler(threading.Thread):
                     print(id_addr, addr[0], id_visibility)
 
                     if id_visibility == 0:
-                        ret.append((1, -3)) #Error 3: Key is not visible
+                        ret.append((1, -8))                                  #Error 8: Key is not visible
                     elif id_visibility == 1 and id_addr != addr[0]:
-                        ret.append((1, -4)) #Error 4: Key is not visible to this address
+                        ret.append((1, -9))                                  #Error 9: Key is not visible to this address
                     else:
                         ret.append(self.mib.get_value(i))
                 else:
@@ -146,6 +137,8 @@ class RequestHandler(threading.Thread):
             if ret:
                 values_set, erros = [], []
                 values_set, erros = self.sort_errors_from_instance(ret)
+
+
 
                 print("Sending response message: ", len(ret))
                 answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(ret), ret, 0, [])
@@ -164,24 +157,26 @@ class RequestHandler(threading.Thread):
 
     def add_key_entry(self, keyValue, keyRequester, keyExpirationDate, keyExpirationTime, keyVisibility):
         result = []
-        print("teste")
         keyID = self.mib.get_unused_number()
         values = [keyID, keyValue, keyRequester, keyExpirationDate, keyExpirationTime, keyVisibility]
-        oids = [(f"1.3.3.{X}.{keyID}") for inst in range(1, 7)]
+        oids = [(f"1.3.3.{inst}.{keyID}") for inst in range(1, 7)]
         #try:
-        for oid, value in zip(oids, values):
-            if int(self.mib.get_value("1.3.1.0")[1]) < X:                       #type: ignore
+
+        curr_num_keys = self.mib.get_value("1.3.1.0")[1]
+        if curr_num_keys < X:
+
+            for oid, value in zip(oids, values): 
                 set_or_nah = self.mib.set_value(oid, value, admin=True)
                 result.append(set_or_nah)
-            else:
-                print("Max number of keys reached")
+        else:
+            print("Max number of keys reached")
+
         #except Exception as e:
         #    print(e, "Error adding key entry")
         #    return result
-        print("teste")
 
-        if result: 
-            new_value = int(self.mib.get_value("1.3.1.0", True)[1]) + 1
+        if result: #TODO verificar se tem erros no result?
+            new_value = curr_num_keys + 1
             self.mib.set_value("1.3.1.0", new_value, admin=True)
             self.mib.used_ids.append(keyID)
         return result
@@ -208,10 +203,7 @@ class RequestHandler(threading.Thread):
 
                     ret = self.add_key_entry(key, addr[0], key_exp_date_formatted, key_exp_time_formatted, int(W_value))
                     if ret:  
-                        #keyvisibility_oid, value = ret
-                        #answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, 1, [(keyvisibility_oid, value)], 0, [])
 
-                        values_set, erros = [], []
                         values_set, erros = self.sort_errors_from_instance(ret)
 
                         if len(values_set) == 0:
@@ -237,6 +229,29 @@ class RequestHandler(threading.Thread):
             # TODO:
             elif W_oid.startswith("1.3.3.6."):                             #! Request to change current key visibility
                 keyID = int(W_oid.split(".")[-1])
+                instance_addr = self.mib.get_value(f"1.3.3.3.{keyID}")[1]
+                if instance_addr == addr[0]:
+                    ret = self.mib.set_value(W_oid, int(W_value), admin=False)
+                    if ret:
+                        values_set, erros = self.sort_errors_from_instance(ret)
+
+                        if len(values_set) == 0:
+                            answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, 1, [(0,0)], len(erros), erros)
+                        elif len(erros) == 0:
+                            answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, 1, [(0,0)])
+                        else:
+                            answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, len(erros), erros)
+                        print(answer_pdu)
+                        enc_answer_pdu = answer_pdu.encode()
+
+                        try:
+                            self.socket.sendto(enc_answer_pdu, addr)
+                        except:
+                            print("Error sending response Message")
+                            sys.exit(1)
+
+                    else:
+                        print("Error changing key visibility")
                 pass
             #   testar se 1.3.3.3.X == addr em que se recebeu o pedido
             #   caso seja alterar

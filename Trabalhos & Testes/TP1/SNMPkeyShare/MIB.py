@@ -33,7 +33,7 @@ class SNMPKeyShareMIB:
 
     # function to update initial values  #TODO: isto é preciso????
     def set_initial_values(self, K, T, X, V, M):
-        init_oids = []
+        print("Setting initial values...")
         self.set_value("1.1.1.0", 1,  True)
         self.set_value("1.1.2.0", 2,  True)
         self.set_value("1.1.3.0", K,  True)
@@ -44,6 +44,7 @@ class SNMPKeyShareMIB:
         self.set_value("1.2.2.0", 33, True)
         self.set_value("1.2.3.0", 94, True)
         self.set_value("1.3.1.0", 0,  True)
+        print("Initial values set!")
 
         #Following lines are for testing purposes
         #self.set_value("1.1.1.0", 1)
@@ -147,7 +148,7 @@ class SNMPKeyShareMIB:
                         return (oid, -2)                                    #Error 2: OID not found (noSuchName)
                     
                     mib_dict[keys[-1]] = set_value
-                    print(f"{oid} -> {self.get_value(oid, admin=True)}")
+                    print(f"    {self.get_value(oid, admin=True)}")
                     return (oid, self.get_value(oid, True)[1]) #type: ignore
             else:
                 print("OID Syntax not supported")

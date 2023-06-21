@@ -46,7 +46,7 @@ class SNMPManager():
             snd = int(values[1])
 
 
-            pairs = re.findall(r'\((\d.\d.\d.(?:\d.)?\d),(\d+)\)', command)
+            pairs = re.findall(r'\((\d.\d.\d.(?:\d.)?\d),\s?(\d+)\)', command)
             tuple_list = [(x, y) for x, y in pairs]
 
             pdu = SNMPkeySharePDU(0, 0, [], P, Y, snd, tuple_list, 0, [])                    #type: ignore
@@ -87,7 +87,7 @@ class SNMPManager():
             if(self.verify_pdu(pdu)):
                 print("Valid PDU")
             else: 
-                print(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.")
+                print(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.") #type: ignore
                 input("Press Enter to continue...")
                 self.waitForCommand()
             
@@ -107,7 +107,6 @@ class SNMPManager():
 
             if(data):
                 print("Message received")
-                print(data)
                 print(dec_pdu)
                 break
 

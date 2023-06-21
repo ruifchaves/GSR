@@ -90,6 +90,7 @@ class SNMPkeySharePDU:
             f"({err[0]}, Error {err[1]}: wrongType)"    if err[1] == "7" else
             f"({err[0]}, Error {err[1]}: Key value is not visible)" if err[1] == "8" else
             f"({err[0]}, Error {err[1]}: Key value is only visible to the requester)" if err[1] == "9" else
+            f"({err[0]}, Error {err[1]}: endOfMIBView)" if err[1] == "10" else
             f"({err[0]}, {err[1]})" 
             for err in self.errors]
         errors_list_str = "\n    ".join(errors_list)

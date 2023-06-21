@@ -29,16 +29,10 @@ class RequestHandler(threading.Thread):
 
 
 
-    def send_response(self, P, L, R):
-        #try:
-        #    print(pdu)
-        #    pdu_encoded = pdu.encode()
-        #    self.socket.sendto(pdu_encoded, (self.agentIP, self.port))
-        #except:
-        #    print("Unable to send Response Message")
-        pass
 
-    #! Funcoes auxiliares que permitem tratar pedidos devidamente
+
+
+    #! SEND RESPONSE AND AUXILIARY FUNCTIONS
     # Funcao que divide (IID, valor) em (IID, valor) e (IID, error_code)
     def sort_errors_from_instance(self, ret):
         error = []
@@ -54,10 +48,38 @@ class RequestHandler(threading.Thread):
 
         return ret, error
 
+    # Funcao que envia resposta ao pedido
+    def send_response(self, dec_pdu, addr, ret):
+        try:
+            values_set, erros = self.sort_errors_from_instance(ret)
 
-    # Funcao auxiliar que retorna lista de oids lexicograficamente seguintes (apenas do mesmo grupo - system, config or data)
+            if len(values_set) == 0:
+                answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, 1, [(0,0)], len(erros), erros)
+            elif len(erros) == 0:
+                answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, 1, [(0,0)])
+            else:
+                answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, len(erros), erros)
+            print(answer_pdu)
+            enc_answer_pdu = answer_pdu.encode()
+            print(enc_answer_pdu)
+            try:
+                print("Sending response message: ", len(ret))
+                self.socket.sendto(enc_answer_pdu, addr)
+            except Exception as e:
+                print("Unable to send Response Message: ", e)
+                sys.exit(1)
+        except:
+            print("Unable to create Response Message")
+            sys.exit(1)
+
+
+
+
+
+    #! GET REQUEST AND AUXILIARY FUNCTIONS
+    # Funcao auxiliar que retorna lista de oids lexicograficamente seguintes (apenas do mesmo grupo - system, config or data, tendo em conta os ids usados na tabela de chaves)
     def get_next_oids(self, oid, count):
-        possible_oids = ["1.1.1.0", "1.1.2.0", "1.1.3.0", "1.1.4.0", "1.1.5.0", "1.1.6.0", "1.2.1.0", "1.2.2.0", "1.2.3.0"]         #hardcoded but best pratice to maintain SNMP resemblence
+        possible_oids = ["1.1.1.0", "1.1.2.0", "1.1.3.0", "1.1.4.0", "1.1.5.0", "1.1.6.0", "1.2.1.0", "1.2.2.0", "1.2.3.0"]         #hardcoded but best pratice to maintain SNMP resemblence in this implementation (by not getting errors for non existing OIDs, as ideally the MIB would be iterated oid by oid)
         result = []
         current_string = oid
         keys = oid.split(".")
@@ -98,7 +120,8 @@ class RequestHandler(threading.Thread):
                 if len(result) == count:  # Check if desired count is reached
                     break
             
-        #TODO - Verificar se result = [] e retornar erro
+        if result == []:
+            return [(oid, -10)]                                                             #Error 10: No more OIDs past the given one (endOfMIBView)
         print(result)
         return result
 
@@ -132,24 +155,10 @@ class RequestHandler(threading.Thread):
                 print(ret)
 
 
-            print(ret)
-                #TODO Testar deverá ser lista com oids, values em que values podem ser vazios
-            if ret:
-                values_set, erros = [], []
-                values_set, erros = self.sort_errors_from_instance(ret)
-
-
-
-                print("Sending response message: ", len(ret))
-                answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(ret), ret, 0, [])
-                print(answer_pdu)
-                enc_answer_pdu = answer_pdu.encode()
-                print(enc_answer_pdu)
-                try:
-                    self.socket.sendto(enc_answer_pdu, addr)
-                except:
-                    print("Error sending response Message")
-                    sys.exit(1)
+        #TODO Testar deverá ser lista com oids, values em que values podem ser vazios
+        print(ret)
+        if ret:
+            self.send_response(dec_pdu, addr, ret)
 
 
 
@@ -160,20 +169,14 @@ class RequestHandler(threading.Thread):
         keyID = self.mib.get_unused_number()
         values = [keyID, keyValue, keyRequester, keyExpirationDate, keyExpirationTime, keyVisibility]
         oids = [(f"1.3.3.{inst}.{keyID}") for inst in range(1, 7)]
-        #try:
 
         curr_num_keys = self.mib.get_value("1.3.1.0")[1]
         if curr_num_keys < X:
-
             for oid, value in zip(oids, values): 
                 set_or_nah = self.mib.set_value(oid, value, admin=True)
                 result.append(set_or_nah)
         else:
             print("Max number of keys reached")
-
-        #except Exception as e:
-        #    print(e, "Error adding key entry")
-        #    return result
 
         if result: #TODO verificar se tem erros no result?
             new_value = curr_num_keys + 1
@@ -191,6 +194,7 @@ class RequestHandler(threading.Thread):
     # Can try for other groups but will get error (including other instances of keys Table) #TODO Testar isto!!
     # Admin can set values to all groups (except if non-accessible)
     def set_request(self, dec_pdu, addr):
+        ret = []
         for tuple in dec_pdu.instances_values:
             W_oid, W_value = tuple
             if W_oid == "1.3.3.6.0":                                       #! Request to generate new key
@@ -202,67 +206,19 @@ class RequestHandler(threading.Thread):
                     key_exp_time_formatted = key_expiration.hour * 104 + key_expiration.minute * 102 + key_expiration.second
 
                     ret = self.add_key_entry(key, addr[0], key_exp_date_formatted, key_exp_time_formatted, int(W_value))
-                    if ret:  
 
-                        values_set, erros = self.sort_errors_from_instance(ret)
-
-                        if len(values_set) == 0:
-                            answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, 1, [(0,0)], len(erros), erros)
-                        elif len(erros) == 0:
-                            answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, 1, [(0,0)])
-                        else:
-                            answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, len(erros), erros)
-                        print(answer_pdu)
-                        enc_answer_pdu = answer_pdu.encode()
-
-                        try:
-                            self.socket.sendto(enc_answer_pdu, addr)
-                        except:
-                            print("Error sending response Message")
-                            sys.exit(1)
-
-                    else:
-                        print("Error adding key to MIB")
-                #except Exception as e:
-                #    print(e, "Error generating key")
-                #    response = "Invalid SNMP Set Request Syntax"
-            # TODO:
+            
             elif W_oid.startswith("1.3.3.6."):                             #! Request to change current key visibility
                 keyID = int(W_oid.split(".")[-1])
                 instance_addr = self.mib.get_value(f"1.3.3.3.{keyID}")[1]
                 if instance_addr == addr[0]:
-                    ret = self.mib.set_value(W_oid, int(W_value), admin=False)
-                    if ret:
-                        values_set, erros = self.sort_errors_from_instance(ret)
+                    ret.append(self.mib.set_value(W_oid, int(W_value), admin=False))
 
-                        if len(values_set) == 0:
-                            answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, 1, [(0,0)], len(erros), erros)
-                        elif len(erros) == 0:
-                            answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, 1, [(0,0)])
-                        else:
-                            answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, len(erros), erros)
-                        print(answer_pdu)
-                        enc_answer_pdu = answer_pdu.encode()
-
-                        try:
-                            self.socket.sendto(enc_answer_pdu, addr)
-                        except:
-                            print("Error sending response Message")
-                            sys.exit(1)
-
-                    else:
-                        print("Error changing key visibility")
-                pass
-            #   testar se 1.3.3.3.X == addr em que se recebeu o pedido
-            #   caso seja alterar
-            # fazer um set_value admin=False e adicionar a ret
-
-
-
-            #Caso seja o mesmo ip a fazer 
-            #elif W_oid == "1.3.3.{other}.0" for other in range(1, 6):
-            #    print("Should be 1.3.3.6.0 instance")
-            #    sys.exit(1) #TODO remover isto e enviar feedback pelos erros para o cliente?
+            else: 
+                ret.append(self.mib.set_value(W_oid, admin=False))
+            
+        if ret:
+            self.send_response(dec_pdu, addr, ret)
         
 
 

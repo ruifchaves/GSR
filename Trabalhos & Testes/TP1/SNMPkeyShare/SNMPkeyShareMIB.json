@@ -48,6 +48,14 @@
         "STATUS":     "current",
         "DESCRIPTION": "The number of seconds of the TTL of the generated keys.",
         "0":          ""
+      },
+      "7": {
+        "NAME":       "timestamp S",
+        "SYNTAX":     "INTEGER",
+        "MAX-ACCESS": "read-only",
+        "STATUS":     "current",
+        "DESCRIPTION": "The number of seconds that have passed since agent started/restarted.",
+        "0":          ""
       }
     },
 

@@ -4,7 +4,7 @@ import json, time, threading, datetime
 
 
 class SNMPKeyShareMIB:
-    def __init__(self, K, T, X, V, M):
+    def __init__(self, K, T, X, V, M, start_time):
         self.mib = dict()
         self.mib_system = dict()
         self.mib_config = dict()
@@ -13,13 +13,17 @@ class SNMPKeyShareMIB:
 
         # ii. Manter um objeto de gestão que indique (em segundos) há quanto tempo o agente
         #     iniciou/reiniciou a sua execução (timespamp S);
-        self.start_time = time.time()
+        self.start_time = start_time
 
         self.importMIB('SNMPkeyShareMIB.json')
         self.set_initial_values(K, T, X, V, M)
 
         # Start the cleanup thread
         cleanup_thread = threading.Thread(target=self.clean_expired_thread, args=(V,))
+        cleanup_thread.start()
+
+        # Start the update timestamp thread
+        cleanup_thread = threading.Thread(target=self.increment_timestamp_thread, args=(5,))
         cleanup_thread.start()
 
 
@@ -40,6 +44,7 @@ class SNMPKeyShareMIB:
         self.set_value("1.1.4.0", T,  True)
         self.set_value("1.1.5.0", X,  True)
         self.set_value("1.1.6.0", V,  True)
+        self.set_value("1.1.7.0", 0,  True)
         self.set_value("1.2.1.0", M,  True)
         self.set_value("1.2.2.0", 33, True)
         self.set_value("1.2.3.0", 94, True)
@@ -212,3 +217,19 @@ class SNMPKeyShareMIB:
             else:
                 print(f"Key {id} is still valid")
                 pass
+
+
+
+
+
+    def increment_timestamp_thread(self, seconds):
+        while True:
+            time.sleep(seconds)
+            self.increment_timestamp()
+
+    def increment_timestamp(self):
+        now = time.time()
+        new = int(now - self.start_time)
+        self.set_value("1.1.7.0", new, admin=True)
+
+

@@ -28,12 +28,12 @@ class RequestHandler(threading.Thread):
         self.mib = mib
 
 
-        self.get_next_oids("1.3.1.0", 9)
-        self.get_next_oids("1.3.1.0", 1)
-        self.get_next_oids("1.3.3.1.0", 1)
-        self.get_next_oids("1.3.3.1.0", 9)
-        self.get_next_oids("1.3.3.1.2", 1)
-        self.get_next_oids("1.3.3.1.4", 9)
+        #self.get_next_oids("1.3.1.0", 9)
+        #self.get_next_oids("1.3.1.0", 1)
+        #self.get_next_oids("1.3.3.1.0", 1)
+        #self.get_next_oids("1.3.3.1.0", 9)
+        #self.get_next_oids("1.3.3.1.2", 1)
+        #self.get_next_oids("1.3.3.1.4", 9)
 
 
 
@@ -83,7 +83,7 @@ class RequestHandler(threading.Thread):
     #! GET REQUEST AND AUXILIARY FUNCTIONS
     # Funcao auxiliar que retorna lista de oids lexicograficamente seguintes (apenas do mesmo grupo - system, config or data, tendo em conta os ids usados na tabela de chaves)
     def get_next_oids(self, oid, count):
-        possible_oids = ["1.1.1.0", "1.1.2.0", "1.1.3.0", "1.1.4.0", "1.1.5.0", "1.1.6.0", "1.2.1.0", "1.2.2.0", "1.2.3.0"]         #hardcoded but best pratice to maintain SNMP resemblence in this implementation (by not getting errors for non existing OIDs, as ideally the MIB would be iterated oid by oid)
+        possible_oids = ["1.1.1.0", "1.1.2.0", "1.1.3.0", "1.1.4.0", "1.1.5.0", "1.1.6.0", "1.1.7.0", "1.2.1.0", "1.2.2.0", "1.2.3.0"]         #hardcoded but best pratice to maintain SNMP resemblence in this implementation (by not getting errors for non existing OIDs, as ideally the MIB would be iterated oid by oid)
         result = []
         current_string = oid
         keys = oid.split(".")
@@ -94,9 +94,9 @@ class RequestHandler(threading.Thread):
         #The SNMP agent will respond with an SNMP error, specifically an "End of MIB View" error (SNMPv2c) or "noSuchObject" error (SNMPv1). This indicates that the requested OID does not exist or that there are no further OIDs available in the MIB that are lexicographically greater than the given OID.
         #In such a case, the SNMP agent will not gather or return any OID values beyond the non-existent OID. The SNMP manager will receive the error response and handle it accordingly.
         oid_value = self.mib.get_value(oid, admin=True)
-        #if oid_value[1] == -2:
-        #    print(-2)
-        #    return -2                                                            #Error 2: OID does not exist
+        if oid_value[1] == -2:
+            print(-2)
+            return -2                                                            #Error 2: OID does not exist
                 
         if len(keys) == 4 and oid != "1.3.1.0":
             result.append(current_string)
@@ -335,7 +335,8 @@ def main():
     print("A Inicializar agente SNMP...")
 
     read_configuration_file("config.ini")
-    MIB = SNMPKeyShareMIB(K, T, X, V, M)
+    start_time = time.time()
+    MIB = SNMPKeyShareMIB(K, T, X, V, M, start_time)
     KEYS = Keys(M, K, T, V)
 
     rH = RequestHandler(MIB, KEYS)

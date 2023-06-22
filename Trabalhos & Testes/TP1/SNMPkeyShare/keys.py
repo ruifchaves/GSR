@@ -4,13 +4,12 @@ from datetime import datetime, timedelta
 
 
 class Keys:
-    def __init__(self, M, K, T, V):
+    def __init__(self, M, K, V):
         if type(M) is str:
             M = np.array([int(c) for c in M])
             #print("M:", M)
         self.M = M
         self.K = K
-        self.T = T/1000 # convert to seconds
         self.V = V
         self.Z = self.generate_matrix_Z()
         self.update_count = 0

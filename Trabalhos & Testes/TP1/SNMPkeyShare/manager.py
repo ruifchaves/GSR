@@ -10,7 +10,6 @@ class SNMPManager():
         self.ip = '127.0.0.3'
         self.agentIP = agentIP
         self.port = snmpport
-        self.V = V
         self.p_id_key = {}
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -35,7 +34,7 @@ class SNMPManager():
         print("2. Gerar uma chave e mudar a visibilidade  [snmpkeyshare-set(P,2,(1.3.3.6.0,1) (1.3.3.6.0,2))]")
         print("---------------------------------------------------------------")
         command = input("Introduza o comando: ")
-        self.request(command)
+        self.send_request(command)
     
     # Build PDU from specified command and its parameters
     def build_pdu(self, command):
@@ -82,7 +81,7 @@ class SNMPManager():
         return True, 0
 
     # Send PDU to agent
-    def request(self, command):
+    def send_request(self, command):
         if command == "exit":
             sys.exit()
         elif command == "1":
@@ -115,8 +114,11 @@ class SNMPManager():
             input("Press Enter to continue...")
             self.waitForCommand()
         
+        print("Message sent")        
+     
 
-        print("Message sent")
+
+    def get_response(self, pdu):
         try:
             # NOTE: "não é obrigatório que o agente responda, nem que responda num intervalo de tempo qualquer, nem que responda aos pedidos
             #       numa ordem qualquer pré-definida;" 
@@ -124,7 +126,7 @@ class SNMPManager():
             #            OU -> o cliente não fica à espera de uma resposta do agente?
             message_received = False
             now = time.time()
-            while time.time() < now + self.V:
+            while time.time() < now + self.timeout:
                 data, addr = self.socket.recvfrom(4096)
                 if addr[0] == self.agentIP:
 
@@ -141,7 +143,7 @@ class SNMPManager():
                 #   depois ver se o id resposta é igual ao que fizemos
 
             if not message_received:
-                raise Exception(f"Timeout. Agent did not respond within {self.V} seconds or at all or the message did not arrive.")
+                raise Exception(f"Timeout. Agent did not respond within {self.timeout} seconds or at all or the message did not arrive.")
         except Exception as e:
             print("Unable to receive Message:\n", e)
                 
@@ -150,9 +152,6 @@ class SNMPManager():
 
         input("Press Enter to continue...")
         self.waitForCommand()
-     
-
-
 
 
 

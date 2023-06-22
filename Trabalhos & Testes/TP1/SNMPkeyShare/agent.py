@@ -14,7 +14,7 @@ class RequestHandler(threading.Thread):
         self.socket.bind((IP, PORT))
         self.port = PORT
         self.mib = SNMPKeyShareMIB()
-        self.keys = Keys(M, K, T, V)
+        self.keys = Keys(M, K, V)
         self.K = K
         self.T = T
         self.X = X
@@ -23,6 +23,7 @@ class RequestHandler(threading.Thread):
         self.start_time = start_time
         self.set_mib_initial_values()
         self.used_ids = []
+        self.addr_pAndTime = {}
 
         # Start the matrix update thread
         matrix_update = threading.Thread(target=self.update_matrix_thread, args=(20000,))
@@ -273,9 +274,31 @@ class RequestHandler(threading.Thread):
         print(ret)
         if ret:
             self.send_response(dec_pdu, addr, ret)
-        
 
 
+
+
+    def verify_pdu(self, pdu, addr):
+        P = pdu.request_id
+
+        if addr in self.addr_pAndTime:
+            addr_requests = self.addr_pAndTime[addr]
+            for p, t in addr_requests:
+                if P == p:
+                    diff_time = time.time() - t
+                    if diff_time < self.V:
+                        return False, 1
+                    else:
+                        addr_requests.remove((p, t))
+
+        if pdu.num_instances != len(pdu.instances_values):
+            return False, 2
+
+
+        self.addr_pAndTime[addr].append((P, time.time()))
+        return True, 0
+
+    #! Funcao que recebe um pedido, valida-o e delega o processamento para a funcao correspondente consoante o tipo de pedido
     def run(self):
         try:
             while True:
@@ -284,19 +307,27 @@ class RequestHandler(threading.Thread):
                 if addr[1] == self.port:
                     #block access below while flag is True but dont lose requests #TODO
                 
+
+
                     try:
                         dec_pdu = SNMPkeySharePDU.decode(data.decode())
+                        valid_or_not = self.verify_pdu(dec_pdu, addr)
+                        if valid_or_not[0]:
+                            if dec_pdu.primitive_type == 1:
+                                print("Get request received")
+                                print(dec_pdu)
+                                self.get_request(dec_pdu, addr)
+                            elif dec_pdu.primitive_type == 2:
+                                print("Set request received")
+                                print(dec_pdu)
+                                self.set_request(dec_pdu, addr)
+                            else:
+                                print("Invalid SNMP request received")
+                        elif valid_or_not[1] == 1:
+                            raise Exception(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.")  #type: ignore
+                        elif valid_or_not[1] == 2:
+                            raise Exception(f"Invalid PDU: Number of elements of instances list ({pdu.num_instances}) is not the same as the size of the list ({len(pdu.instances_values)}).")  #type: ignore
 
-                        if dec_pdu.primitive_type == 1:
-                            print("Get request received")
-                            print(dec_pdu)
-                            self.get_request(dec_pdu, addr)
-                        elif dec_pdu.primitive_type == 2:
-                            print("Set request received")
-                            print(dec_pdu)
-                            self.set_request(dec_pdu, addr)
-                        else:
-                            print("Invalid SNMP request received")
 
                     except Exception as e:
                         print("Exception occurred while processing request:", e)

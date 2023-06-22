@@ -64,7 +64,7 @@ class Keys:
         j = self.random(self.Z[i, 0], 0, self.K - 1)
 
         C = self.xor(self.Z[i], self.transpose(self.Z[:, j]))
-        C = ''.join(chr(byte) for byte in C) # Convert to ascii string
+        C = ''.join(chr(byte % 94 + 33) for byte in C if byte!=0) # Convert to ascii string         #TODO go get from mib table values
 
         return C, datetime.now() + timedelta(seconds=self.V)
 

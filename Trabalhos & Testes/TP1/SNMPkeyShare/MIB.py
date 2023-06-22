@@ -9,7 +9,6 @@ class SNMPKeyShareMIB:
         self.mib_system = dict()
         self.mib_config = dict()
         self.mib_data = dict()
-        self.used_ids = []
 
         # ii. Manter um objeto de gestão que indique (em segundos) há quanto tempo o agente
         #     iniciou/reiniciou a sua execução (timespamp S);
@@ -18,13 +17,7 @@ class SNMPKeyShareMIB:
         self.importMIB('SNMPkeyShareMIB.json')
         self.set_initial_values(K, T, X, V, M)
 
-        # Start the cleanup thread
-        cleanup_thread = threading.Thread(target=self.clean_expired_thread, args=(V,))
-        cleanup_thread.start()
 
-        # Start the update timestamp thread
-        cleanup_thread = threading.Thread(target=self.increment_timestamp_thread, args=(5,))
-        cleanup_thread.start()
 
 
     #! Initizalization of MIB as dictionary and its values
@@ -50,21 +43,6 @@ class SNMPKeyShareMIB:
         self.set_value("1.2.3.0", 94, True)
         self.set_value("1.3.1.0", 0,  True)
         print("Initial values set!")
-
-        self.X = X
-
-        #Following lines are for testing purposes
-        #self.set_value("1.1.1.0", 1)
-        #self.set_value("1.2.1.0", M)
-        #self.set_value("1.3.1.0", 0)
-
-        #print(self.get_value("1.1.1.0", True))
-        #print(self.get_value("1.2.1.0", True))
-        #print(self.get_value("1.3.1.0", True))
-
-        #print(self.get_value("1.1.1.0"))
-        #print(self.get_value("1.2.1.0"))
-        #print(self.get_value("1.3.1.0"))
 
 
     # function to translate oid to value
@@ -155,7 +133,7 @@ class SNMPKeyShareMIB:
                         return (oid, -2)                                    #Error 2: OID not found (noSuchName)
                     
                     mib_dict[keys[-1]] = set_value
-                    print(f"    {self.get_value(oid, admin=True)}")
+                    #print(f"    {self.get_value(oid, admin=True)}")
                     return (oid, self.get_value(oid, True)[1]) #type: ignore
             else:
                 print("OID Syntax not supported")
@@ -170,68 +148,10 @@ class SNMPKeyShareMIB:
 
 
 
-    #! Auxiliary function: Spits out available Key ID
-    def get_unused_number(self):
-        for i in range(1, self.X+1):
-            if i not in self.used_ids:
-                return i
-        return None
-
-
-
-    #! Functions related to key cleanup
-    def decrease_dataNumberOfValidKeys(self):
-        new_value = int(self.get_value("1.3.1.0", True)[1]) - 1     #type: ignore
-        self.set_value("1.3.1.0", new_value, admin=True)
-
-    def compare_to_datetime(self, keyExpirationDate, keyExpirationTime):
-        # Get current date and time
-        cur_datetime = datetime.datetime.now()
-
-        cur_date = cur_datetime.year * 104 + cur_datetime.month * 102 + cur_datetime.day
-        cur_time = cur_datetime.hour * 104 + cur_datetime.minute * 102 + cur_datetime.second
-
-        # Compare expiration_datetime to current_datetime
-        if keyExpirationDate < cur_date:                                        # Key has expired
-            return True         
-        elif keyExpirationDate == cur_date and keyExpirationTime < cur_time:    # Key has expired
-            return True         
-        else:                                                                   # Key is still valid
-            return False        
-
-    def clean_expired_thread(self, V):
-        while True:
-            time.sleep(V)
-            self.remove_expired_entries()
-
-    def remove_expired_entries(self):
-        for id in self.used_ids:
-            print(f"Checking key {id}")
-            keyExpirationDate = int(self.mib_data["3"]["4"][str(id)])
-            keyExpirationTime = int(self.mib_data["3"]["5"][str(id)])
-
-            if self.compare_to_datetime(keyExpirationDate, keyExpirationTime):
-                for entry in range(1, 7):
-                    print(f"Gonna delete key {id}.{entry}")
-                    del self.mib_data["3"][str(entry)][f"{id}"]
-                self.decrease_dataNumberOfValidKeys()
-                self.used_ids.remove(id)
-            else:
-                print(f"Key {id} is still valid")
-                pass
+ 
 
 
 
 
-    #! Functions related to timestamp S instance update
-    def increment_timestamp_thread(self, seconds):
-        while True:
-            time.sleep(seconds)
-            self.increment_timestamp()
-
-    def increment_timestamp(self):
-        now = time.time()
-        new = int(now - self.start_time)
-        self.set_value("1.1.7.0", new, admin=True)
 
 

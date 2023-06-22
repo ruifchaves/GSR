@@ -77,35 +77,27 @@ class SNMPkeySharePDU:
             "Set" if self.primitive_type == 2 else
             "Unknown")
 
-        instances_values_str = ' '.join([f"({instance[0]}, {instance[1]})" for instance in self.instances_values])
+        instances_values_str = '\n                             '.join([f"({instance[0]}, {instance[1]})" for instance in self.instances_values])
 
-        errors_list = [
-            f"({err[0]}, {err[1]}: noError)"      if err[1] == "0" else 
-            f"({err[0]}, Error {err[1]}: tooBig)"       if err[1] == "1" else 
-            f"({err[0]}, Error {err[1]}: noSuchName)"   if err[1] == "2" else
-            f"({err[0]}, Error {err[1]}: badValue)"     if err[1] == "3" else
-            f"({err[0]}, Error {err[1]}: readOnly)"     if err[1] == "4" else
-            f"({err[0]}, Error {err[1]}: genErr)"       if err[1] == "5" else
-            f"({err[0]}, Error {err[1]}: noAccess)"     if err[1] == "6" else
-            f"({err[0]}, Error {err[1]}: wrongType)"    if err[1] == "7" else
-            f"({err[0]}, Error {err[1]}: Key value is not visible)" if err[1] == "8" else
-            f"({err[0]}, Error {err[1]}: Key value is only visible to the requester)" if err[1] == "9" else
-            f"({err[0]}, Error {err[1]}: endOfMIBView)" if err[1] == "10" else
-            f"({err[0]}, {err[1]})" 
-            for err in self.errors]
-        errors_list_str = "\n    ".join(errors_list)
 
-        error_list_str = (
-            f"""Number of errors   (Nr):     {self.num_errors}
-  Error list         (R):      
-    {errors_list_str}""" if self.num_errors != 0 else ""
-        )
+        errors_list = [ f"({err[0]}, {err[1]}: noError)"      if err[1] == "0" else 
+                        f"({err[0]}, Error {err[1]}: tooBig)"       if err[1] == "1" else 
+                        f"({err[0]}, Error {err[1]}: noSuchName)"   if err[1] == "2" else
+                        f"({err[0]}, Error {err[1]}: badValue)"     if err[1] == "3" else
+                        f"({err[0]}, Error {err[1]}: readOnly)"     if err[1] == "4" else
+                        f"({err[0]}, Error {err[1]}: genErr)"       if err[1] == "5" else
+                        f"({err[0]}, Error {err[1]}: noAccess)"     if err[1] == "6" else
+                        f"({err[0]}, Error {err[1]}: wrongType)"    if err[1] == "7" else
+                        f"({err[0]}, Error {err[1]}: Key value is not visible)" if err[1] == "8" else
+                        f"({err[0]}, Error {err[1]}: Key value is only visible to the requester)" if err[1] == "9" else
+                        f"({err[0]}, Error {err[1]}: endOfMIBView)" if err[1] == "10" else
+                        f"({err[0]}, {err[1]})"                     for err in self.errors]
+        errors_list_str = "                     ".join(errors_list)
+        error_list_str1 = (f"{errors_list_str}")
 
 
         return f"""
-  Request ID         (P):      {self.request_id}
-  Primitive Type     (Y):      {self.primitive_type} ({primitive_type_str})
-  Number of elements (Nl/Nw):  {self.num_instances}
-  Instance list      (L/W):    {instances_values_str}
-  {error_list_str}
+[PDU] ID (P): {self.request_id}      Primitive Type (Y): {self.primitive_type} ({primitive_type_str})     Instance size (Nl/Nw): {self.num_instances}     Errors size (Nr): {self.num_errors}
+      Instance list (L/W):   {instances_values_str}
+      Errors list     (R):   {error_list_str1}
 """

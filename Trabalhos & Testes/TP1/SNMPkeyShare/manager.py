@@ -13,7 +13,7 @@ class SNMPManager():
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((self.ip, self.port))
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        #self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.waitForCommand()
         
         
@@ -27,6 +27,10 @@ class SNMPManager():
         print("snmpkeyshare-get(P,Nl,L)  [e.g. snmpkeyshare-get(1,1,(x,y))]")
         print("snmpkeyshare-set(P,Nw,W)  [e.g. snmpkeyshare-set(55,2,(x,y)(z,j))]")
         print("exit")
+        print("---------------------------------------------------------------")
+        print("                     Sugestões de comandos                     ")
+        print("1. Gerar uma chave visível apenas para mim [snmpkeyshare-set(P,1,(1.3.3.6.0,1))]")
+        print("2. Gerar uma chave e mudar a visibilidade  [snmpkeyshare-set(P,2,(1.3.3.6.0,1) (1.3.3.6.0,2))]")
         print("---------------------------------------------------------------")
         command = input("Introduza o comando: ")
         self.request(command)
@@ -49,7 +53,7 @@ class SNMPManager():
             pairs = re.findall(r'\((\d.\d.\d.(?:\d.)?\d),\s?(\d+)\)', command)
             tuple_list = [(x, y) for x, y in pairs]
 
-            pdu = SNMPkeySharePDU(0, 0, [], P, Y, snd, tuple_list, 0, [])                    #type: ignore
+            pdu = SNMPkeySharePDU(0, 0, [], P, Y, snd, tuple_list, 1, [(0,0)])                    #type: ignore
             return pdu
         except:
             print("Invalid Command")
@@ -61,10 +65,14 @@ class SNMPManager():
     def verify_pdu(self, pdu):
         P = pdu.request_id
 
-        if(P in self.p_time):
+        if P in self.p_time:
             diff_time = time.time() - self.p_time[P]
-            if(diff_time < self.timeout):
-                return False
+            if diff_time < self.timeout:
+                return 1
+        
+        print("")
+        if pdu.num_instances != len(pdu.instances_values):
+            return 2
 
         self.p_time[P] = time.time()
         return True
@@ -74,43 +82,50 @@ class SNMPManager():
         if command == "exit":
             sys.exit()
         elif command == "1":
-            command = "snmpkeyshare-get(1,1,(1,1))"        
+            command = "snmpkeyshare-set(1,1,(1.3.3.6.0,1))"
         elif command == "2":
-            command = "snmpkeyshare-set(1,1,(1,1))"        
+            command = "snmpkeyshare-set(2,2,(1.3.3.6.0,1) (1.3.3.6.0,2))"        
         elif command == "3":
-            command = "snmpkeyshare-set(1,1,(1.3.3.6.0,2))"
+            command = "snmpkeyshare-set(3,1,(1.3.3.6.0,2))"
         elif command == "4":
-            command = "get(2,1,(1.3.3.3.1,3))"        
+            command = "get(4,1,(1.3.3.3.1,3))"        
         elif command == "5":
-            command = "get(2,1,(1.3.3.3.1,1))"
+            command = "get(5,1,(1.3.3.3.1,1))"
 
         try:
             pdu = self.build_pdu(command)
-            if(self.verify_pdu(pdu)):
+            valid_or_not = self.verify_pdu(pdu)
+            if valid_or_not:
                 print("Valid PDU")
-            else: 
-                print(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.") #type: ignore
-                input("Press Enter to continue...")
-                self.waitForCommand()
-            
+            elif valid_or_not == 1:
+                raise Exception(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.")  #type: ignore
+            elif valid_or_not == 2:
+                raise Exception(f"Invalid PDU: Number of elements of instances list {pdu.num_instances} is not the same as the size of the list {len(pdu.num_instances)}.")  #type: ignore
+
             print(pdu)
             pdu_encoded = pdu.encode()
             self.socket.sendto(pdu_encoded, (self.agentIP, self.port))
-        except:
-            print("Unable to send Message")
+        except Exception as e:
+            print("Unable to send Message:\n", e)
             input("Press Enter to continue...")
             self.waitForCommand()
         
         print("Message sent")
-        now = time.time()
-        while time.time() < now + 2:
-            data, addr = self.socket.recvfrom(1024)
-            dec_pdu = SNMPkeySharePDU.decode(data.decode())
+        try:
+            now = time.time()
+            while time.time() < now + 2:
+                data, addr = self.socket.recvfrom(1024)
+                print(data)
+                dec_pdu = SNMPkeySharePDU.decode(data.decode())
 
-            if(data):
-                print("Message received")
-                print(dec_pdu)
-                break
+                if(data):
+                    print("Message received")
+                    print(dec_pdu)
+                    break
+                #TODO adicionar mais cenas aqui
+        except Exception as e:
+            print("Unable to receive Message:\n", e)
+                
 
 
         input("Press Enter to continue...")
@@ -132,7 +147,11 @@ def read_configuration_file(config_file):
 
 def main():
     config_values = read_configuration_file("config.ini")
-    manager = SNMPManager(config_values[0], config_values[1], config_values[2])
+    try:        
+        manager = SNMPManager(config_values[0], config_values[1], config_values[2])
+    except KeyboardInterrupt:
+        print("\nExiting...")
+        sys.exit(0)
     
 if __name__ == "__main__":
     main()

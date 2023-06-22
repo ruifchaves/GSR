@@ -10,6 +10,8 @@ class SNMPManager():
         self.ip = '127.0.0.3'
         self.agentIP = agentIP
         self.port = snmpport
+        self.V = V
+        self.p_id_key = {}
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((self.ip, self.port))
@@ -62,20 +64,22 @@ class SNMPManager():
 
 
     # Check if PDU Request ID is valid (not repeated within timeout period)
+    # TODO: passar esta verificacao para o agente (ignorando o PDU se for invalido)
+    #       -> o agente é que sabe se o PDU é valido ou não
+    
     def verify_pdu(self, pdu):
         P = pdu.request_id
 
         if P in self.p_time:
             diff_time = time.time() - self.p_time[P]
             if diff_time < self.timeout:
-                return 1
-        
-        print("")
+                return False, 1
+
         if pdu.num_instances != len(pdu.instances_values):
-            return 2
+            return False, 2
 
         self.p_time[P] = time.time()
-        return True
+        return True, 0
 
     # Send PDU to agent
     def request(self, command):
@@ -84,49 +88,65 @@ class SNMPManager():
         elif command == "1":
             command = "snmpkeyshare-set(1,1,(1.3.3.6.0,1))"
         elif command == "2":
-            command = "snmpkeyshare-set(2,2,(1.3.3.6.0,1) (1.3.3.6.0,2))"        
+            command = "snmpkeyshare-set(2,2,(1.3.3.6.0, 1) (1.3.3.6.0, 2))"
         elif command == "3":
-            command = "snmpkeyshare-set(3,1,(1.3.3.6.0,2))"
+            command = "get(323, 3, (1.1.1.0, 3) (1.1.1.0,0) (1.3.3.2.1, 3))"
         elif command == "4":
-            command = "get(4,1,(1.3.3.3.1,3))"        
+            command = "get(333, 3, (1.3.1.0, 3) (1.3.3.5.1, 8) (1.3.3.2.2, 3))"  
         elif command == "5":
             command = "get(5,1,(1.3.3.3.1,1))"
 
         try:
             pdu = self.build_pdu(command)
             valid_or_not = self.verify_pdu(pdu)
-            if valid_or_not:
+            if valid_or_not[0]:
                 print("Valid PDU")
-            elif valid_or_not == 1:
+            elif valid_or_not[1] == 1:
                 raise Exception(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.")  #type: ignore
-            elif valid_or_not == 2:
-                raise Exception(f"Invalid PDU: Number of elements of instances list {pdu.num_instances} is not the same as the size of the list {len(pdu.num_instances)}.")  #type: ignore
+            elif valid_or_not[1] == 2:
+                raise Exception(f"Invalid PDU: Number of elements of instances list ({pdu.num_instances}) is not the same as the size of the list ({len(pdu.instances_values)}).")  #type: ignore
 
             print(pdu)
             pdu_encoded = pdu.encode()
             self.socket.sendto(pdu_encoded, (self.agentIP, self.port))
+
         except Exception as e:
             print("Unable to send Message:\n", e)
             input("Press Enter to continue...")
             self.waitForCommand()
         
+
         print("Message sent")
         try:
+            # NOTE: "não é obrigatório que o agente responda, nem que responda num intervalo de tempo qualquer, nem que responda aos pedidos
+            #       numa ordem qualquer pré-definida;" 
+            #               -> por isso, se o agente não responder, o cliente não faz nada 
+            #            OU -> o cliente não fica à espera de uma resposta do agente?
+            message_received = False
             now = time.time()
-            while time.time() < now + 2:
-                data, addr = self.socket.recvfrom(1024)
-                print(data)
-                dec_pdu = SNMPkeySharePDU.decode(data.decode())
+            while time.time() < now + self.V:
+                data, addr = self.socket.recvfrom(4096)
+                if addr[0] == self.agentIP:
 
-                if(data):
-                    print("Message received")
-                    print(dec_pdu)
-                    break
+                    if(data):
+                        dec_pdu = SNMPkeySharePDU.decode(data.decode())
+                        print("Message received")
+                        print(dec_pdu)
+                        message_received = True
+                        break
+                    
                 #TODO adicionar mais cenas aqui
+                # se quisermos saber a key de outro manager
+                #   temos que guardar todos os pedidos que fizemos e saber o tipo de cada um (get/set e oids pedido)
+                #   depois ver se o id resposta é igual ao que fizemos
+
+            if not message_received:
+                raise Exception(f"Timeout. Agent did not respond within {self.V} seconds or at all or the message did not arrive.")
         except Exception as e:
             print("Unable to receive Message:\n", e)
                 
-
+        #if message_received and P in self.W
+        #    self.p_id_key = dec_pdu.request_id
 
         input("Press Enter to continue...")
         self.waitForCommand()
@@ -135,8 +155,9 @@ class SNMPManager():
 
 
 
-def read_configuration_file(config_file):
 
+#! Funções que dão inicio ao Manager
+def read_configuration_file(config_file):
     config = configparser.ConfigParser()
     config.read(config_file)
     agentIP = config['Agent']['ip']
@@ -153,6 +174,7 @@ def main():
         print("\nExiting...")
         sys.exit(0)
     
+
 if __name__ == "__main__":
     main()
     

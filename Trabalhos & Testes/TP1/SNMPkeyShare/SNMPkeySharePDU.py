@@ -92,12 +92,12 @@ class SNMPkeySharePDU:
                         f"({err[0]}, Error {err[1]}: Key value is only visible to the requester)" if err[1] == "9" else
                         f"({err[0]}, Error {err[1]}: endOfMIBView)" if err[1] == "10" else
                         f"({err[0]}, {err[1]})"                     for err in self.errors]
-        errors_list_str = "                     ".join(errors_list)
-        error_list_str1 = (f"{errors_list_str}")
+        #errors_list_str = "                     ".join(errors_list)
+        errors_list_str = "                             ".join([error + "\n" for error in errors_list])
 
 
         return f"""
 [PDU] ID (P): {self.request_id}      Primitive Type (Y): {self.primitive_type} ({primitive_type_str})     Instance size (Nl/Nw): {self.num_instances}     Errors size (Nr): {self.num_errors}
       Instance list (L/W):   {instances_values_str}
-      Errors list     (R):   {error_list_str1}
+      Errors list     (R):   {errors_list_str}
 """

@@ -4,19 +4,13 @@ import json, time, threading, datetime
 
 
 class SNMPKeyShareMIB:
-    def __init__(self, K, T, X, V, M, start_time):
+    def __init__(self):
         self.mib = dict()
         self.mib_system = dict()
         self.mib_config = dict()
         self.mib_data = dict()
 
-        # ii. Manter um objeto de gestão que indique (em segundos) há quanto tempo o agente
-        #     iniciou/reiniciou a sua execução (timespamp S);
-        self.start_time = start_time
-
         self.importMIB('SNMPkeyShareMIB.json')
-        self.set_initial_values(K, T, X, V, M)
-
 
 
 
@@ -28,21 +22,7 @@ class SNMPKeyShareMIB:
         self.mib_config = self.mib["1"]["2"]
         self.mib_data   = self.mib["1"]["3"]
 
-    # function to update initial values  #TODO: isto é preciso????
-    def set_initial_values(self, K, T, X, V, M):
-        print("Setting initial values...")
-        self.set_value("1.1.1.0", 1,  True)
-        self.set_value("1.1.2.0", 2,  True)
-        self.set_value("1.1.3.0", K,  True)
-        self.set_value("1.1.4.0", T,  True)
-        self.set_value("1.1.5.0", X,  True)
-        self.set_value("1.1.6.0", V,  True)
-        self.set_value("1.1.7.0", 0,  True)
-        self.set_value("1.2.1.0", M,  True)
-        self.set_value("1.2.2.0", 33, True)
-        self.set_value("1.2.3.0", 94, True)
-        self.set_value("1.3.1.0", 0,  True)
-        print("Initial values set!")
+
 
 
     # function to translate oid to value
@@ -133,7 +113,7 @@ class SNMPKeyShareMIB:
                         return (oid, -2)                                    #Error 2: OID not found (noSuchName)
                     
                     mib_dict[keys[-1]] = set_value
-                    #print(f"    {self.get_value(oid, admin=True)}")
+                    #print(f"  {self.get_value(oid, admin=True)}")
                     return (oid, self.get_value(oid, True)[1]) #type: ignore
             else:
                 print("OID Syntax not supported")

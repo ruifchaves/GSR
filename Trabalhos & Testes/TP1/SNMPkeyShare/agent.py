@@ -13,28 +13,46 @@ class RequestHandler(threading.Thread):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((IP, PORT))
         self.port = PORT
-        self.mib = SNMPKeyShareMIB(K, T, X, V, M, start_time)
+        self.mib = SNMPKeyShareMIB()
         self.keys = Keys(M, K, T, V)
         self.K = K
-        self.T = T/1000     # convert to seconds
+        self.T = T
         self.X = X
         self.V = V
         self.M = M
         self.start_time = start_time
+        self.set_mib_initial_values()
         self.used_ids = []
 
-
         # Start the matrix update thread
-        #matrix_update = threading.Thread(target=self.update_matrix_thread, args=(T,))
-        #matrix_update.start()
+        matrix_update = threading.Thread(target=self.update_matrix_thread, args=(20000,))
+        matrix_update.start()
 
         # Start the cleanup thread
         cleanup_thread = threading.Thread(target=self.clean_expired_thread, args=(V,))
         cleanup_thread.start()
 
         # Start the update timestamp thread
-        increase_timestamp = threading.Thread(target=self.increment_timestamp_thread, args=(20,)) # TODO passar isto para 1 seg em vez de 20
+        increase_timestamp = threading.Thread(target=self.increment_timestamp_thread, args=(1,))
         increase_timestamp.start()
+
+
+    # function to update initial values
+    def set_mib_initial_values(self):
+        print("Setting initial values...")
+        self.mib.set_value("1.1.1.0", 1,      True)
+        self.mib.set_value("1.1.2.0", 2,      True)
+        self.mib.set_value("1.1.3.0", self.K, True)
+        self.mib.set_value("1.1.4.0", self.T, True)
+        self.mib.set_value("1.1.5.0", self.X, True)
+        self.mib.set_value("1.1.6.0", self.V, True)
+        self.mib.set_value("1.1.7.0", 0,      True)
+        self.mib.set_value("1.2.1.0", self.M, True)
+        self.mib.set_value("1.2.2.0", 33,     True)
+        self.mib.set_value("1.2.3.0", 94,     True)
+        self.mib.set_value("1.3.1.0", 0,      True)
+        print("Initial values set!")
+
 
 
     #! SEND RESPONSE AND AUXILIARY FUNCTIONS
@@ -96,6 +114,9 @@ class RequestHandler(threading.Thread):
         if oid_value[1] == -2:
             print(-2)
             return -2                                                            #Error 2: OID does not exist
+        
+        if count == 0:
+            return [oid]
                 
         if len(keys) == 4 and oid != "1.3.1.0":
             result.append(current_string)
@@ -111,26 +132,26 @@ class RequestHandler(threading.Thread):
             if oid == "1.3.1.0":
                 result.append(current_string)                       # Include the given OID in the result list
                 current_string = "1.3.3.1.0"
-            cur_len_size = count - len(result)
+                
             if int(current_string.split('.')[-1]) in self.used_ids:
                 id_index = self.used_ids.index(int(current_string.split('.')[-1]))
             else:
                 id_index = 0
-            for _ in range(cur_len_size):
+            for _ in range(count+1):
                 for usedid in self.used_ids:
-                    if len(result) == cur_len_size:
+                    if len(result) == count+1:
                         break
                     parts = current_string.split('.')
                     parts[-1] = str(self.used_ids[id_index])
                     result.append('.'.join(parts))
                     id_index = (id_index + 1) % len(self.used_ids)  # Increment index and wrap around if needed
-                    if len(result) == cur_len_size:
+                    if len(result) == count+1:
                         break
                 parts = current_string.split('.')
                 parts[-2] = str(int(parts[-2]) + 1)
                 current_string = '.'.join(parts)
-                
-                if len(result) == cur_len_size:
+                print("result: ",result)
+                if len(result) == count+1:
                     break
             result = [item for item in result if not item.endswith('.7.1') and int(item.split('.')[-2]) < 7]
 
@@ -150,21 +171,23 @@ class RequestHandler(threading.Thread):
             L_oid, L_value = tuple
             L_value = int(L_value)
 
+            print(tuple)
             oids = self.get_next_oids(L_oid, L_value)
-            print(oids)
+            print("next oids: ", oids)
             if oids != -2 and oids != -10:
                 for oid in oids:
                     if oid.startswith("1.3.3.2."):   # type: ignore
                         key_id = oid.split(".")[-1]
 
-                        id_addr = self.mib.get_value(f"1.3.3.4.{key_id}")[1]
+                        id_addr = self.mib.get_value(f"1.3.3.3.{key_id}")[1]
                         id_visibility = self.mib.get_value(f"1.3.3.6.{key_id}")[1]
                         print(id_addr, addr[0], id_visibility)
 
                         if id_visibility == 0:
-                            ret.append((1, -8))                                                 #Error 8: Key is not visible
+                            ret.append((oid, -8))                                                 #Error 8: Key is not visible
                         elif id_visibility == 1 and id_addr != addr[0]:
-                            ret.append((1, -9))                                                 #Error 9: Key is not visible to this address
+                            
+                            ret.append((oid, -9))                                                 #Error 9: Key is not visible to this address
                         else:
                             ret.append(self.mib.get_value(oid))
                     else:
@@ -217,10 +240,6 @@ class RequestHandler(threading.Thread):
         return result
 
 
-
-
-
-
     #! Funcao que trata de um pedido do tipo set
     # Client can only set values to it keyVisibility instance
     # Can try for other groups but will get error (including other instances of keys Table)
@@ -228,26 +247,30 @@ class RequestHandler(threading.Thread):
     def set_request(self, dec_pdu, addr):
         ret = []
         for tuple in dec_pdu.instances_values:
+            print(tuple)
             W_oid, W_value = tuple
             if W_oid == "1.3.3.6.0":                                       #! Request to generate new key
-                    key, key_expiration = self.keys.generate_key()
+                    firstChar = self.mib.get_value("1.2.2.0", admin=True)[1]
+                    numChars  = self.mib.get_value("1.2.3.0", admin=True)[1]
+                    key, key_expiration = self.keys.generate_key(firstChar, numChars) # type: ignore
 
                     self.update_matrix_afterT()
 
                     key_exp_date_formatted = key_expiration.year * 104 + key_expiration.month * 102 + key_expiration.day
                     key_exp_time_formatted = key_expiration.hour * 104 + key_expiration.minute * 102 + key_expiration.second
 
-                    ret = self.add_key_entry(key, addr[0], key_exp_date_formatted, key_exp_time_formatted, int(W_value))
+                    ret += self.add_key_entry(key, addr[0], key_exp_date_formatted, key_exp_time_formatted, int(W_value))
             
             elif W_oid.startswith("1.3.3.6."):                             #! Request to change current key visibility
                 keyID = int(W_oid.split(".")[-1])
                 instance_addr = self.mib.get_value(f"1.3.3.3.{keyID}")[1]
                 if instance_addr == addr[0]:
-                    ret.append(self.mib.set_value(W_oid, int(W_value), admin=False))
+                    ret.append(self.mib.set_value(W_oid, int(W_value)))
 
             else:                                                           #! Other requests 
-                ret.append(self.mib.set_value(W_oid, W_value, admin=False)) #TODO testar os tipos do W_value
+                ret.append(self.mib.set_value(W_oid, W_value))
             
+        print(ret)
         if ret:
             self.send_response(dec_pdu, addr, ret)
         
@@ -258,8 +281,8 @@ class RequestHandler(threading.Thread):
             while True:
                 print("Waiting for request")
                 data, addr = self.socket.recvfrom(4096)
-                if addr[1] == self.port:  # TODO: Is it necessary to check the IP as well?
-                    #block access below while flag is True but dont lose requests
+                if addr[1] == self.port:
+                    #block access below while flag is True but dont lose requests #TODO
                 
                     try:
                         dec_pdu = SNMPkeySharePDU.decode(data.decode())
@@ -290,7 +313,6 @@ class RequestHandler(threading.Thread):
         finally:
             self.socket.close()
 
-
     # Funcao de debug para guardar a MIB num ficheiro json
     def debug(self):
         json.dump(self.mib.mib, open("debug/MIB_debug.json", "w")) #type: ignore
@@ -314,6 +336,7 @@ class RequestHandler(threading.Thread):
 
     #! Funcao que faz update da matrix Z a cada T segundos e guarda o timestamp na MIB
     def update_matrix_thread(self, T):
+        T = int(T/1000)   # convert to seconds
         while True:
             time.sleep(T)
             self.update_matrix_afterT()
@@ -379,6 +402,7 @@ class RequestHandler(threading.Thread):
             time.sleep(seconds)
             self.increment_timestamp()
 
+    # by not incrementing by X seconds, we can have a more precise timestamp
     def increment_timestamp(self):
         now = time.time()
         new = int(now - self.start_time)
@@ -409,18 +433,7 @@ def read_configuration_file(config_file):
     T = int(config['Other']['T'])
     X = int(config['Other']['X'])
     V = int(config['Other']['V'])
-
-    # TODO Add à tabela MIB e ao config.ini
-    #first_char_ascii = 33        #configFirstCharOfKeysAlphabet
-    #num_alphabet_chars = 94      #configCardinalityOfKeysAlphabet
-    #M = np.random.choice(list(map(chr, range(first_char_ascii, first_char_ascii+num_alphabet_chars))), size=2 * K)
-    #M = np.random.randint(low=0, high=256, size=2 * K, dtype=np.uint8)
-    #M = config['Other']['M']
-    #M = config['Other']['M'].encode('ascii', errors='replace')
-    #M = "162561567256152675162756712522"
-    M = "07994506586870582927"
-    #numbers = np.random.randint(0, 9, size=2 * K)
-    #M = ''.join(map(str, numbers))
+    M = str(config['Other']['M'])
 
     if(len(M) != 2*K):
         print("Error: M length must be 2K. Check config.ini file.")
@@ -430,7 +443,6 @@ def read_configuration_file(config_file):
 
 
 def main():
-    global MIB, KEYS
     os.system('cls' if os.name == 'nt' else 'clear')
     print("A Inicializar agente SNMP...")
 

@@ -59,12 +59,12 @@ class Keys:
         self.update_count += 1
         return datetime.now()
 
-    def generate_key(self):
+    def generate_key(self, firstChar=33, numChars=94):
         i = self.random(self.update_count + self.Z[0, 0], 0, self.K - 1)
         j = self.random(self.Z[i, 0], 0, self.K - 1)
 
         C = self.xor(self.Z[i], self.transpose(self.Z[:, j]))
-        C = ''.join(chr(byte % 94 + 33) for byte in C if byte!=0) # Convert to ascii string         #TODO go get from mib table values
+        C = ''.join(chr(byte % numChars + firstChar) for byte in C if byte!=0) # Convert to ascii string         #TODO go get from mib table values
 
         return C, datetime.now() + timedelta(seconds=self.V)
 

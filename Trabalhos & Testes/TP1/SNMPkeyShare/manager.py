@@ -65,20 +65,18 @@ class SNMPManager():
     # Check if PDU Request ID is valid (not repeated within timeout period)
     # TODO: passar esta verificacao para o agente (ignorando o PDU se for invalido)
     #       -> o agente é que sabe se o PDU é valido ou não
-    
     def verify_pdu(self, pdu):
         P = pdu.request_id
 
         if P in self.p_time:
             diff_time = time.time() - self.p_time[P]
             if diff_time < self.timeout:
-                return False, 1
-
-        if pdu.num_instances != len(pdu.instances_values):
-            return False, 2
+                return False
+            else :
+                self.p_time[P] = time.time()
 
         self.p_time[P] = time.time()
-        return True, 0
+        return True
 
     # Send PDU to agent
     def send_request(self, command):
@@ -98,13 +96,11 @@ class SNMPManager():
         try:
             pdu = self.build_pdu(command)
             valid_or_not = self.verify_pdu(pdu)
-            if valid_or_not[0]:
+            if valid_or_not:
                 print("Valid PDU")
-            elif valid_or_not[1] == 1:
+            elif valid_or_not == 1:
                 raise Exception(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.")  #type: ignore
-            elif valid_or_not[1] == 2:
-                raise Exception(f"Invalid PDU: Number of elements of instances list ({pdu.num_instances}) is not the same as the size of the list ({len(pdu.instances_values)}).")  #type: ignore
-
+            
             print(pdu)
             pdu_encoded = pdu.encode()
             self.socket.sendto(pdu_encoded, (self.agentIP, self.port))
@@ -115,10 +111,10 @@ class SNMPManager():
             self.waitForCommand()
         
         print("Message sent")        
-     
+        self.get_response()
 
 
-    def get_response(self, pdu):
+    def get_response(self):
         try:
             # NOTE: "não é obrigatório que o agente responda, nem que responda num intervalo de tempo qualquer, nem que responda aos pedidos
             #       numa ordem qualquer pré-definida;" 

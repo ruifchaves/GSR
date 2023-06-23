@@ -80,7 +80,7 @@ class SNMPkeySharePDU:
         instances_values_str = '\n                             '.join([f"({instance[0]}, {instance[1]})" for instance in self.instances_values])
 
 
-        errors_list = [ f"({err[0]}, {err[1]}: noError)"      if err[1] == "0" else 
+        errors_list = [ f"({err[0]}, {err[1]}: noError)"            if err[1] == "0" else 
                         f"({err[0]}, Error {err[1]}: tooBig)"       if err[1] == "1" else 
                         f"({err[0]}, Error {err[1]}: noSuchName)"   if err[1] == "2" else
                         f"({err[0]}, Error {err[1]}: badValue)"     if err[1] == "3" else

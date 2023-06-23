@@ -12,8 +12,6 @@ class SNMPKeyShareMIB:
 
         self.importMIB('SNMPkeyShareMIB.json')
 
-
-
     #! Initizalization of MIB as dictionary and its values
     # function to import json file and init mib dictionaries
     def importMIB(self, file):
@@ -22,14 +20,10 @@ class SNMPKeyShareMIB:
         self.mib_config = self.mib["1"]["2"]
         self.mib_data   = self.mib["1"]["3"]
 
-
-
-
     # function to translate oid to value
     def translateOID(self, oid):
         keys = oid.split(".")
         return keys
-
 
     #! Get value
     # Client can get values from system and data groups (except keyValue if keyVisibility 0 or not same client and keyVisibility 1)

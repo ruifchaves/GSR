@@ -37,6 +37,9 @@ class RequestHandler(threading.Thread):
         increase_timestamp = threading.Thread(target=self.increment_timestamp_thread, args=(1,))
         increase_timestamp.start()
 
+        #NOTE: ensure the atomicity of the two function calls: generate_key followed by update_matrix_Z
+        self.gen_and_updateZ_atomicity_lock = threading.Lock()
+
 
     # function to update initial values
     def set_mib_initial_values(self):
@@ -83,6 +86,7 @@ class RequestHandler(threading.Thread):
                 answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, 1, [(0,0)])
             else:
                 answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, len(erros), erros)
+                
             print(answer_pdu)
             enc_answer_pdu = answer_pdu.encode()
             try:
@@ -151,7 +155,7 @@ class RequestHandler(threading.Thread):
                 parts = current_string.split('.')
                 parts[-2] = str(int(parts[-2]) + 1)
                 current_string = '.'.join(parts)
-                print("result: ",result)
+
                 if len(result) == count+1:
                     break
             result = [item for item in result if not item.endswith('.7.1') and int(item.split('.')[-2]) < 7]
@@ -159,7 +163,6 @@ class RequestHandler(threading.Thread):
         if result == []:
             print(-10)
             return -10                                                             #Error 10: No more OIDs past the given one (endOfMIBView)
-        print("list oids: ",result)
         return result
 
 
@@ -172,9 +175,7 @@ class RequestHandler(threading.Thread):
             L_oid, L_value = tuple
             L_value = int(L_value)
 
-            print(tuple)
             oids = self.get_next_oids(L_oid, L_value)
-            print("next oids: ", oids)
             if oids != -2 and oids != -10:
                 for oid in oids:
                     if oid.startswith("1.3.3.2."):   # type: ignore
@@ -182,7 +183,6 @@ class RequestHandler(threading.Thread):
 
                         id_addr = self.mib.get_value(f"1.3.3.3.{key_id}")[1]
                         id_visibility = self.mib.get_value(f"1.3.3.6.{key_id}")[1]
-                        print(id_addr, addr[0], id_visibility)
 
                         if id_visibility == 0:
                             ret.append((oid, -8))                                                 #Error 8: Key is not visible
@@ -198,8 +198,6 @@ class RequestHandler(threading.Thread):
             elif oids == -10:
                 ret.append((L_oid, -10))
 
-        #TODO Testar deverá ser lista com oids, values em que values podem ser vazios
-        print(ret)
         if ret:
             self.send_response(dec_pdu, addr, ret)
 
@@ -234,7 +232,7 @@ class RequestHandler(threading.Thread):
             print("Max number of keys reached")
             self.debug()
 
-        if result: #TODO verificar se tem erros no result?
+        if result:
             new_value = int(curr_num_keys) + 1
             self.mib.set_value("1.3.1.0", new_value, admin=True)
             self.used_ids.append(keyID)
@@ -248,14 +246,17 @@ class RequestHandler(threading.Thread):
     def set_request(self, dec_pdu, addr):
         ret = []
         for tuple in dec_pdu.instances_values:
-            print(tuple)
+
             W_oid, W_value = tuple
             if W_oid == "1.3.3.6.0":                                       #! Request to generate new key
                     firstChar = self.mib.get_value("1.2.2.0", admin=True)[1]
                     numChars  = self.mib.get_value("1.2.3.0", admin=True)[1]
-                    key, key_expiration = self.keys.generate_key(firstChar, numChars) # type: ignore
 
-                    self.update_matrix_afterT()
+                    #while self.mib.updating_matrix:
+                    #    pass
+                    with self.gen_and_updateZ_atomicity_lock:
+                        key, key_expiration = self.keys.generate_key(firstChar, numChars) # type: ignore
+                        self.update_matrix_afterT()
 
                     key_exp_date_formatted = key_expiration.year * 104 + key_expiration.month * 102 + key_expiration.day
                     key_exp_time_formatted = key_expiration.hour * 104 + key_expiration.minute * 102 + key_expiration.second
@@ -271,7 +272,6 @@ class RequestHandler(threading.Thread):
             else:                                                           #! Other requests 
                 ret.append(self.mib.set_value(W_oid, W_value))
             
-        print(ret)
         if ret:
             self.send_response(dec_pdu, addr, ret)
 
@@ -280,6 +280,8 @@ class RequestHandler(threading.Thread):
 
     def verify_pdu(self, pdu, addr):
         P = pdu.request_id
+        if pdu.num_instances != len(pdu.instances_values):
+            return False, -1
 
         if addr in self.addr_pAndTime:
             addr_requests = self.addr_pAndTime[addr]
@@ -287,15 +289,14 @@ class RequestHandler(threading.Thread):
                 if P == p:
                     diff_time = time.time() - t
                     if diff_time < self.V:
-                        return False, 1
+                        return False, int(self.V - diff_time)
                     else:
-                        addr_requests.remove((p, t))
+                        addr_requests.remove((p, t))    #Can be removed because have expired and the function will certainly return True
 
-        if pdu.num_instances != len(pdu.instances_values):
-            return False, 2
-
-
+        if addr not in self.addr_pAndTime:
+            self.addr_pAndTime[addr] = []  # Create an empty list for the address
         self.addr_pAndTime[addr].append((P, time.time()))
+
         return True, 0
 
     #! Funcao que recebe um pedido, valida-o e delega o processamento para a funcao correspondente consoante o tipo de pedido
@@ -304,11 +305,7 @@ class RequestHandler(threading.Thread):
             while True:
                 print("Waiting for request")
                 data, addr = self.socket.recvfrom(4096)
-                if addr[1] == self.port:
-                    #block access below while flag is True but dont lose requests #TODO
-                
-
-
+                if addr[1] == self.port:                
                     try:
                         dec_pdu = SNMPkeySharePDU.decode(data.decode())
                         valid_or_not = self.verify_pdu(dec_pdu, addr)
@@ -323,10 +320,11 @@ class RequestHandler(threading.Thread):
                                 self.set_request(dec_pdu, addr)
                             else:
                                 print("Invalid SNMP request received")
-                        elif valid_or_not[1] == 1:
-                            raise Exception(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.")  #type: ignore
-                        elif valid_or_not[1] == 2:
-                            raise Exception(f"Invalid PDU: Number of elements of instances list ({pdu.num_instances}) is not the same as the size of the list ({len(pdu.instances_values)}).")  #type: ignore
+
+                        elif valid_or_not[1] == -1:
+                            raise Exception(f"Invalid PDU: Number of elements of instances list ({dec_pdu.num_instances}) is not the same as the size of the list ({len(dec_pdu.instances_values)}).")  #type: ignore
+                        else:
+                            raise Exception(f"Invalid PDU: Wait {valid_or_not[1]} seconds before reusing the Request ID {dec_pdu.request_id}.")  #type: ignore
 
 
                     except Exception as e:
@@ -373,6 +371,7 @@ class RequestHandler(threading.Thread):
             self.update_matrix_afterT()
 
     def update_matrix_afterT(self):
+
         updated_time = self.keys.update_matrix_Z()
 
         systemRestartDate = updated_time.year * 104 + updated_time.month * 102 + updated_time.day

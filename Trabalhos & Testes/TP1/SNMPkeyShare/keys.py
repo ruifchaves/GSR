@@ -1,6 +1,6 @@
 import numpy as np
 from datetime import datetime, timedelta
-
+import threading
 
 
 class Keys:
@@ -13,8 +13,10 @@ class Keys:
         self.V = V
         self.Z = self.generate_matrix_Z()
         self.update_count = 0
+        self.matrix_updating = False        
 
-
+        #NOTE: ensure that update_matrix_Z() and generate_key() do not run simultaneously and interfere with each other
+        self.matrix_updating_lock = threading.Lock()
 
 
     def rotate(self, seq, n):
@@ -29,7 +31,6 @@ class Keys:
 
     def xor(self, *args):
         result = args[0]
-
         for arg in args[1:]:
             result = np.bitwise_xor(result, arg)
         return result
@@ -48,36 +49,31 @@ class Keys:
         Z = self.xor(ZA, ZB, ZC, ZD)
         return Z
 
-    def update_matrix_Z(self):
-        for i in range(self.K):
-            self.Z[i] = self.rotate(self.Z[i], self.random(self.Z[i, 0], 0, self.K - 1))
 
-        for j in range(self.K):
-            self.Z[:, j] = self.rotate(self.Z[:, j], self.random(self.Z[0, j], 0, self.K - 1))
 
-        self.update_count += 1
-        return datetime.now()
 
     def generate_key(self, firstChar=33, numChars=94):
-        i = self.random(self.update_count + self.Z[0, 0], 0, self.K - 1)
-        j = self.random(self.Z[i, 0], 0, self.K - 1)
+        #while self.matrix_updating:
+        #    pass
+        with self.matrix_updating_lock:
+            i = self.random(self.update_count + self.Z[0, 0], 0, self.K - 1)
+            j = self.random(self.Z[i, 0], 0, self.K - 1)
 
-        C = self.xor(self.Z[i], self.transpose(self.Z[:, j]))
-        C = ''.join(chr(byte % numChars + firstChar) for byte in C if byte!=0) # Convert to ascii string         #TODO go get from mib table values
+            C = self.xor(self.Z[i], self.transpose(self.Z[:, j]))
+            C = ''.join(chr(byte % numChars + firstChar) for byte in C if byte!=0) # Convert to ascii string within limits given (ensure printable characters and not nulls)
 
-        return C, datetime.now() + timedelta(seconds=self.V)
-
-
-
-
-
+            return C, datetime.now() + timedelta(seconds=self.V)
 
 
+    def update_matrix_Z(self):
+        with self.matrix_updating_lock:
+            self.matrix_updating = True
+            for i in range(self.K):
+                self.Z[i] = self.rotate(self.Z[i], self.random(self.Z[i, 0], 0, self.K - 1))
 
+            for j in range(self.K):
+                self.Z[:, j] = self.rotate(self.Z[:, j], self.random(self.Z[0, j], 0, self.K - 1))
 
-
-
-
-
-
-
+            self.update_count += 1
+            self.matrix_updating = False
+            return datetime.now()

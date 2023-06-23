@@ -7,7 +7,6 @@ class Keys:
     def __init__(self, M, K, V):
         if type(M) is str:
             M = np.array([int(c) for c in M])
-            #print("M:", M)
         self.M = M
         self.K = K
         self.V = V

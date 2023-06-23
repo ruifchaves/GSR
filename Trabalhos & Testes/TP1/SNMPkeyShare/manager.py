@@ -12,12 +12,19 @@ class SNMPManager():
         self.port = snmpport
         self.p_id_key = {}
 
+        #self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.init()
+
+    def init(self):
+        ip = input("Enter your the IP: ")
+        if ip == "1":   self.ip = "127.0.0.3"
+        elif ip == "2": self.ip = "127.0.0.4"
+        print("IP set to: " + self.ip)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((self.ip, self.port))
-        #self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        input("Press Enter to continue...")
         self.waitForCommand()
-        
-        
+
     def waitForCommand(self):
         os.system('cls' if os.name == 'nt' else 'clear')
             

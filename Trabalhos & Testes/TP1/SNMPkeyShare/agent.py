@@ -12,6 +12,7 @@ class RequestHandler(threading.Thread):
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((IP, PORT))
+        self.socket.settimeout(None)
         self.port = PORT
         self.mib = SNMPKeyShareMIB()
         self.keys = Keys(M, K, V)
@@ -24,18 +25,19 @@ class RequestHandler(threading.Thread):
         self.set_mib_initial_values()
         self.used_ids = []
         self.addr_pAndTime = {}
+        self.stop_signal_received = False
 
         # Start the matrix update thread
-        matrix_update = threading.Thread(target=self.update_matrix_thread, args=(20000,))
-        matrix_update.start()
+        self.matrix_update_thread = threading.Thread(target=self.update_matrix_thread, args=(20000,)) #TOOO remover this
+        self.matrix_update_thread.start()
 
         # Start the cleanup thread
-        cleanup_thread = threading.Thread(target=self.clean_expired_thread, args=(V,))
-        cleanup_thread.start()
+        self.cleanup_thread = threading.Thread(target=self.clean_expired_thread, args=(V,))
+        self.cleanup_thread.start()
 
         # Start the update timestamp thread
-        increase_timestamp = threading.Thread(target=self.increment_timestamp_thread, args=(1,))
-        increase_timestamp.start()
+        self.increase_timestamp_thread = threading.Thread(target=self.increment_timestamp_thread, args=(1,))
+        self.increase_timestamp_thread.start()
 
         #NOTE: ensure the atomicity of the two function calls: generate_key followed by update_matrix_Z
         self.gen_and_updateZ_atomicity_lock = threading.Lock()
@@ -301,11 +303,23 @@ class RequestHandler(threading.Thread):
 
     #! Funcao que recebe um pedido, valida-o e delega o processamento para a funcao correspondente consoante o tipo de pedido
     def run(self):
+
+        def monitor_stop_signal():
+            while not self.stop_signal_received:
+                time.sleep(1)  # Check the flag every second
+            #self.socket.shutdown(socket.SHUT_RDWR)
+            self.socket.close()  # Close the socket when the flag is set to True
+            print("Socket closed")
+
+        monitor_thread = threading.Thread(target=monitor_stop_signal)
+        monitor_thread.start()
+
         try:
-            while True:
+            while not self.stop_signal_received:
                 print("Waiting for request")
+
                 data, addr = self.socket.recvfrom(4096)
-                if addr[1] == self.port:                
+                if data and addr[1] == self.port:
                     try:
                         dec_pdu = SNMPkeySharePDU.decode(data.decode())
                         valid_or_not = self.verify_pdu(dec_pdu, addr)
@@ -326,21 +340,24 @@ class RequestHandler(threading.Thread):
                         else:
                             raise Exception(f"Invalid PDU: Wait {valid_or_not[1]} seconds before reusing the Request ID {dec_pdu.request_id}.")  #type: ignore
 
-
                     except Exception as e:
                         print("Exception occurred while processing request:", e)
                         # Handle the exception here (e.g., log the error, send an error response, etc.)
 
-                else:
-                    pass
+            self.debug()
+            print("passsseii aqui stopped")
+            #self.cleanup_thread.join()
+            #monitor_thread.join()
+            #self.clean_expired_thread.join()
+            #self.update_matrix_thread.join()
 
         except Exception as e:
-            print("RequestHandler received Exception. Stopping...")
+
             print(e)
             self.debug()
-            sys.exit(1)
-        finally:
+            print("RequestHandler received Exception. Stopping...")
             self.socket.close()
+
 
     # Funcao de debug para guardar a MIB num ficheiro json
     def debug(self):
@@ -366,9 +383,11 @@ class RequestHandler(threading.Thread):
     #! Funcao que faz update da matrix Z a cada T segundos e guarda o timestamp na MIB
     def update_matrix_thread(self, T):
         T = int(T/1000)   # convert to seconds
-        while True:
-            time.sleep(T)
+        while not self.stop_signal_received:
+            time.sleep(5)
             self.update_matrix_afterT()
+        print("Matrix Update Thread stopped")
+
 
     def update_matrix_afterT(self):
 
@@ -406,13 +425,14 @@ class RequestHandler(threading.Thread):
             return False        
 
     def clean_expired_thread(self, V):
-        while True:
-            time.sleep(V)
+        while not self.stop_signal_received:
+            time.sleep(5)
             self.remove_expired_entries()
+        print("Remove Expired Keys Thread stopped")
 
     def remove_expired_entries(self):
         for id in self.used_ids:
-            keyExpirationDate = int(self.mib.mib_data["3"]["4"][str(id)])       #NOTE: directly accessed mib_data because it's faster
+            keyExpirationDate = int(self.mib.mib_data["3"]["4"][str(id)])       #NOTE: directly accessed mib_data because it's faster, might change to get_value for consistency
             keyExpirationTime = int(self.mib.mib_data["3"]["5"][str(id)])
 
             if self.compare_to_datetime(keyExpirationDate, keyExpirationTime):
@@ -428,9 +448,10 @@ class RequestHandler(threading.Thread):
 
     #! Functions related to timestamp S instance update
     def increment_timestamp_thread(self, seconds):
-        while True:
-            time.sleep(seconds)
+        while not self.stop_signal_received:
+            time.sleep(5)
             self.increment_timestamp()
+        print("Increment Timestamp Thread stopped")
 
     # by not incrementing by X seconds, we can have a more precise timestamp
     def increment_timestamp(self):
@@ -472,6 +493,8 @@ def read_configuration_file(config_file):
     return IP, PORT, K, T, X, V, M
 
 
+
+
 def main():
     os.system('cls' if os.name == 'nt' else 'clear')
     print("A Inicializar agente SNMP...")
@@ -479,7 +502,26 @@ def main():
     IP, PORT, K, T, X, V, M = read_configuration_file("config.ini")
     start = time.time()
     rH = RequestHandler(IP, PORT, K, T, X, V, M, start)
-    rH.start()
+
+    try:
+        rH.daemon = True
+        rH.start()
+        while not rH.stop_signal_received:    #input 1 recebido: guardar MIB
+            debug = input("")
+            if rH.stop_signal_received:
+                break
+            elif debug == "1":
+                rH.debug()
+    
+
+    except KeyboardInterrupt:
+        # Gracefully close the agent
+        print("Stopping RequestHandler...")
+        rH.debug()
+        rH.stop_signal_received = True
+        #rH.join()   # Wait for the RequestHandler thread to finish
+        print("Stopping...")
+        #sys.exit(0)
 
 
 if __name__ == '__main__':

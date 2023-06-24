@@ -13,9 +13,11 @@ class SNMPManager():
         self.p_id_key = {}
 
         #self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.init()
+        self.setIP()
+        self.waitForCommand()
 
-    def init(self):
+
+    def setIP(self):
         ip = input("Enter your the IP: ")
         if ip == "1":   self.ip = "127.0.0.3"
         elif ip == "2": self.ip = "127.0.0.4"
@@ -23,7 +25,7 @@ class SNMPManager():
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((self.ip, self.port))
         input("Press Enter to continue...")
-        self.waitForCommand()
+
 
     def waitForCommand(self):
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -32,13 +34,13 @@ class SNMPManager():
         print("                   Bem Vindo ao SNMPkeyShare                   ")
         print("---------------------------------------------------------------")
         print("                     Primitivas disponíveis                    ")
-        print("snmpkeyshare-get(P,Nl,L)  [e.g. snmpkeyshare-get(1,1,(x,y))]")
-        print("snmpkeyshare-set(P,Nw,W)  [e.g. snmpkeyshare-set(55,2,(x,y)(z,j))]")
+        print("snmpkeyshare-get(Nl,L)  [e.g. snmpkeyshare-get(1,(x,y))]")
+        print("snmpkeyshare-set(Nw,W)  [e.g. snmpkeyshare-set(2,(x,y)(z,j))]")
         print("exit")
         print("---------------------------------------------------------------")
         print("                     Sugestões de comandos                     ")
-        print("1. Gerar uma chave visível apenas para mim [snmpkeyshare-set(P,1,(1.3.3.6.0,1))]")
-        print("2. Gerar uma chave e mudar a visibilidade  [snmpkeyshare-set(P,2,(1.3.3.6.0,1) (1.3.3.6.0,2))]")
+        print("1. Gerar uma chave visível apenas para mim [snmpkeyshare-set(1,(1.3.3.6.0,1))]")
+        print("2. Gerar uma chave e mudar a visibilidade  [snmpkeyshare-set(2,(1.3.3.6.0,1) (1.3.3.6.0,2))]")
         print("---------------------------------------------------------------")
         command = input("Introduza o comando: ")
         self.send_request(command)
@@ -51,54 +53,59 @@ class SNMPManager():
             elif("set" in command):
                 Y = 2
 
+
             # Parse do comando
             substring = command[command.find("(") + 1: command.find(")")]
             values = substring.split(",")
-            P = int(values[0])
-            snd = int(values[1])
+            
+            
+            #! DEBUG
+            #P = int(values[0])
+            P = random.randint(0, 1000)
+            Nl_Nw = int(values[0])
 
 
             pairs = re.findall(r'\((\d.\d.\d.(?:\d.)?\d),\s?(\d+)\)', command)
             tuple_list = [(x, y) for x, y in pairs]
 
-            pdu = SNMPkeySharePDU(0, 0, [], P, Y, snd, tuple_list, 1, [(0,0)])                    #type: ignore
+            pdu = SNMPkeySharePDU(0, 0, [], P, Y, Nl_Nw, tuple_list, 1, [(0,0)])                    #type: ignore
             return pdu
         except:
             print("Invalid Command")
             input("Press Enter to continue...")
             self.waitForCommand()
 
-
-    # Check if PDU Request ID is valid (not repeated within timeout period)
-    # TODO: passar esta verificacao para o agente (ignorando o PDU se for invalido)
-    #       -> o agente é que sabe se o PDU é valido ou não
+    
+    # Verify if PDU is valid (more specifically its ID P, all other fields are assumed to be valid and later verified by the agent, ignoring the invalid messages)
     def verify_pdu(self, pdu):
         P = pdu.request_id
 
         if P in self.p_time:
             diff_time = time.time() - self.p_time[P]
-            if diff_time < self.timeout:
+            # "aconselhável que o gestor não utilize valores para P repetidos num intervalo temporal muito maior que V segundos": self.timeout*3
+            if diff_time < (self.timeout *3) :
                 return False
-            else :
-                self.p_time[P] = time.time()
+                
+            
 
         self.p_time[P] = time.time()
         return True
+
 
     # Send PDU to agent
     def send_request(self, command):
         if command == "exit":
             sys.exit()
         elif command == "1":
-            command = "snmpkeyshare-set(1,1,(1.3.3.6.0,1))"
+            command = "snmpkeyshare-set(1,(1.3.3.6.0,1))"
         elif command == "2":
-            command = "snmpkeyshare-set(2,2,(1.3.3.6.0, 1) (1.3.3.6.0, 2))"
+            command = "snmpkeyshare-set(2,(1.3.3.6.0, 1) (1.3.3.6.0, 2))"
         elif command == "3":
-            command = "get(323, 3, (1.1.1.0, 3) (1.1.1.0,0) (1.3.3.2.1, 3))"
+            command = "get(3, (1.1.1.0, 3) (1.1.1.0,0) (1.3.3.2.1, 3))"
         elif command == "4":
-            command = "get(333, 3, (1.3.1.0, 3) (1.3.3.5.1, 8) (1.3.3.2.2, 3))"  
+            command = "get(3, (1.3.1.0, 3) (1.3.3.5.1, 8) (1.3.3.2.2, 3))"  
         elif command == "5":
-            command = "get(5,1,(1.3.3.3.1,1))"
+            command = "get(1,(1.3.3.3.1,1))"
 
         try:
             pdu = self.build_pdu(command)
@@ -106,8 +113,9 @@ class SNMPManager():
             if valid_or_not:
                 print("Valid PDU")
             elif valid_or_not == 1:
-                raise Exception(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.")  #type: ignore
-            
+                print(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.\nTrying again...")  #type: ignore
+                while not self.verify_pdu(pdu):
+                    pdu = pdu._replace(request_id = random.randint(0, 1000))  #type: ignore
             print(pdu)
             pdu_encoded = pdu.encode()
             self.socket.sendto(pdu_encoded, (self.agentIP, self.port))

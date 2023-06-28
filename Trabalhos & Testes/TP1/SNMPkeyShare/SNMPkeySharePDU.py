@@ -37,9 +37,7 @@ class SNMPkeySharePDU:
     
     # Encodes a PDU to a string
     def encode(self):
-        print("PDU", self.security_params_list)
         security_params_str = '\x00'.join(self.security_params_list)
-        print("PDU", security_params_str)
         instances_values_str = '\x00'.join([f"{instance[0]}\x00{instance[1]}" for instance in self.instances_values])
         errors_str =           '\x00'.join([f"{err[0]}\x00{err[1]}" for err in self.errors])
         pdu_string = f"{self.security_model}\x00{self.security_params_num}\x00{security_params_str}\x00{self.request_id}\x00{self.primitive_type}\x00{self.num_instances}\x00{instances_values_str}\x00{self.num_errors}\x00{errors_str}\x00"
@@ -98,5 +96,4 @@ class SNMPkeySharePDU:
         return f"""
 [PDU] ID (P): {self.request_id}      Primitive Type (Y): {self.primitive_type} ({primitive_type_str})     Instance size (Nl/Nw): {self.num_instances}     Errors size (Nr): {self.num_errors}
       Instance list (L/W):   {instances_values_str}
-      Errors list     (R):   {errors_list_str}
-"""
+      Errors list     (R):   {errors_list_str}"""

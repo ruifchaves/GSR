@@ -34,18 +34,34 @@ class SNMPManager():
     def waitForCommand(self):
         os.system('cls' if os.name == 'nt' else 'clear')
             
-        print("---------------------------------------------------------------")
-        print("                   Bem Vindo ao SNMPkeyShare                   ")
-        print("---------------------------------------------------------------")
-        print("                     Primitivas disponíveis                    ")
-        print("snmpkeyshare-get(Nl,L)  [e.g. snmpkeyshare-get(1,(x,y))]")
-        print("snmpkeyshare-set(Nw,W)  [e.g. snmpkeyshare-set(2,(x,y)(z,j))]")
-        print("exit")
-        print("---------------------------------------------------------------")
-        print("                     Sugestões de comandos                     ")
-        print("1. Gerar uma chave visível apenas para mim [snmpkeyshare-set(1,(1.3.3.6.0,1))]")
-        print("2. Gerar uma chave e mudar a visibilidade  [snmpkeyshare-set(2,(1.3.3.6.0,1) (1.3.3.6.0,2))]")
-        print("---------------------------------------------------------------")
+        print("---------------------------------------------------------------------------------------------------------------")
+        print("                                            Bem Vindo ao SNMPkeyShare                                          ")
+        print("---------------------------------------------------------------------------------------------------------------")
+        print("                                              Primitivas disponíveis                                           ")
+        print("    snmpkeyshare-get(Nl,L)  [e.g. snmpkeyshare-get(1,(x,y))]                                                   ")
+        print("    snmpkeyshare-set(Nw,W)  [e.g. snmpkeyshare-set(2,(x,y)(z,j))]                                              ")
+        print("    exit                                                                                                       ")                                                        
+        print("---------------------------------------------------------------------------------------------------------------")
+        print("                                              Sugestões de comandos                                            ")
+        print("1.  Gerar 1 chave visível apenas para mim:                set(1, (1.3.3.6.0, 1))                               ")
+        print("2.  Gerar 1 chave visível visivel para todos:             set(1, (1.3.3.6.0, 2))                               ")
+        print("3.  Gerar 1 chave e alterar visibilidade: (key 1)         set(2, (1.3.3.6.0, 1) (1.3.3.6.1, 2))                ")
+        print("4.  Gerar 2 chaves:                                       set(2, (1.3.3.6.0, 1) (1.3.3.6.0, 2))                ")
+        print("5.  Gerar 1 chave invisível:                              set(1, (1.3.3.6.0, 0))                               ")
+        print("6.  Alterar 1 valor de system e 1 de config:              set(2, (1.1.1.0, 3278) (1.2.1.0, 2187))              ")
+        print("7.  Obter 1 valor de system:                              get(1, (1.1.2.0, 0))                                 ")
+        print("8.  Obter 3 valores de system:                            get(1, (1.1.1.0, 3))                                 ")
+        print("9.  Obter 10 valores de system:                           get(1, (1.1.1.0, 10))                                ")
+        print("10. Obter 1 valor de config:                              get(1, (1.2.1.0, 0))                                 ")
+        print("11. Obter 10 valores de config:                           get(1, (1.2.1.0, 10))                                ")
+        print("12. Obter 10 valores de config e 10 de system:            get(2, (1.2.1.0, 10) (1.1.1.0, 10))                  ")
+        print("13. Obter todos os valores do grupo data:                 get(1, (1.3.1.0, 500))                               ")
+        print("14. Obter 1 valor de chave (key 1):                       get(1, (1.3.3.3.1, 0))                               ")
+        print("15. Obter 1 valor de chave (ñ existente):                 get(1, (1.3.3.3.0, 0))                               ")
+        print("16. Obter 10 valores de chave (após ñ existente):         get(1, (1.3.3.6.0, 10))                              ")
+        print("17. Obter 10 valores de chave (após existente):           get(1, (1.3.3.4.1, 10))                              ")
+        print("18. Obter todos os valores da MIB:                        get(3, (1.1.1.0, 10) (1.2.1.0, 10) (1.3.1.0, 500))")
+        print("---------------------------------------------------------------------------------------------------------------")
         command = input("Introduza o comando: ")
         self.send_request(command)
     
@@ -109,16 +125,24 @@ class SNMPManager():
     def send_request(self, command):
         if command == "exit":
             sys.exit()
-        elif command == "1":
-            command = "snmpkeyshare-set(1,(1.3.3.6.0,1))"
-        elif command == "2":
-            command = "snmpkeyshare-set(2,(1.3.3.6.0, 1) (1.3.3.6.0, 2))"
-        elif command == "3":
-            command = "get(3, (1.1.1.0, 3) (1.1.1.0,0) (1.3.3.2.1, 3))"
-        elif command == "4":
-            command = "get(3, (1.3.1.0, 3) (1.3.3.5.1, 8) (1.3.3.2.2, 3))"  
-        elif command == "5":
-            command = "get(1,(1.3.3.3.1,1))"
+        elif command == "1":  command = "snmpkeyshare-set(1, (1.3.3.6.0, 1))"
+        elif command == "2":  command = "snmpkeyshare-set(1, (1.3.3.6.0, 2))"
+        elif command == "3":  command = "snmpkeyshare-set(2, (1.3.3.6.0, 1) (1.3.3.6.1, 2))"
+        elif command == "4":  command = "snmpkeyshare-set(2, (1.3.3.6.0, 1) (1.3.3.6.0, 2))"
+        elif command == "5":  command = "snmpkeyshare-set(1, (1.3.3.6.0, 0))"
+        elif command == "6":  command = "snmpkeyshare-set(2, (1.1.1.0, 3278) (1.2.1.0, 2187))"
+        elif command == "7":  command = "snmpkeyshare-get(1, (1.1.2.0, 0))"
+        elif command == "8":  command = "snmpkeyshare-get(1, (1.1.1.0, 3))"
+        elif command == "9":  command = "snmpkeyshare-get(1, (1.1.1.0, 10))"
+        elif command == "10":  command = "snmpkeyshare-get(1, (1.2.1.0, 0))"
+        elif command == "11":  command = "snmpkeyshare-get(1, (1.2.1.0, 10))"
+        elif command == "12":  command = "snmpkeyshare-get(2, (1.2.1.0, 10) (1.1.1.0, 10))"
+        elif command == "13":  command = "snmpkeyshare-get(1, (1.3.1.0, 500))"
+        elif command == "14":  command = "snmpkeyshare-get(1, (1.3.3.3.1, 0))"
+        elif command == "15":  command = "snmpkeyshare-get(1, (1.3.3.3.0, 0))"
+        elif command == "16":  command = "snmpkeyshare-get(1, (1.3.3.6.0, 10))"
+        elif command == "17":  command = "snmpkeyshare-get(1, (1.3.3.4.1, 10))"
+        elif command == "18":  command = "snmpkeyshare-get(3, (1.1.1.0, 10) (1.2.1.0, 10) (1.3.1.0, 500))"
 
         try:
             pdu = self.build_pdu(command)
@@ -129,9 +153,9 @@ class SNMPManager():
                 print(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.\nTrying again...")  #type: ignore
                 while not self.verify_pdu(pdu):
                     pdu = pdu._replace(request_id = random.randint(0, 1000))  #type: ignore
+                print
             print(pdu)
             pdu_encoded = pdu.encode()
-            print(pdu_encoded)
             encrypted_pdu = self.cypher.encrypt(pdu_encoded)
             self.socket.sendto(encrypted_pdu, (self.agentIP, self.port))
 
@@ -142,10 +166,6 @@ class SNMPManager():
         
         print("Message sent")        
         self.get_response()
-
-
-
-
 
 
     #! Funcao que verifica se a mensagem recebida é autêntica
@@ -174,29 +194,20 @@ class SNMPManager():
             while time.time() < now + self.timeout:
                 data, addr = self.socket.recvfrom(4096)
                 if addr[0] == self.agentIP:
-                    print(data)
                     if(data):
                         print("Message received")
                         decrypted_data = self.cypher.decrypt(data)
                         dec_pdu = SNMPkeySharePDU.decode(decrypted_data.decode())
-                        print(dec_pdu)
                         if self.verify_authentication(dec_pdu):
                             print(dec_pdu)
                             message_received = True
                             break
-                        
-                #TODO adicionar mais cenas aqui
-                # se quisermos saber a key de outro manager
-                #   temos que guardar todos os pedidos que fizemos e saber o tipo de cada um (get/set e oids pedido)
-                #   depois ver se o id resposta é igual ao que fizemos
 
             if not message_received:
                 raise Exception(f"Timeout. Agent did not respond within {self.timeout} seconds or at all or the message did not arrive.")
         except Exception as e:
             print("Unable to receive Message:\n", e)
                 
-        #if message_received and P in self.W
-        #    self.p_id_key = dec_pdu.request_id
 
         input("Press Enter to continue...")
         self.waitForCommand()

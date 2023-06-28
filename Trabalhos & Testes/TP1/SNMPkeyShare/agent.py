@@ -26,10 +26,10 @@ class RequestHandler(threading.Thread):
         self.K = K
         self.T = T
         self.X = X
-        self.V = V
+        self.V = V  
         self.M = M
         self.KEY = KEY.encode()
-        self.CYPHER = Fernet(self.KEY)
+        self.CYPHER = Fernet(self.KEY) #type: Fernet
         self.start_time = start_time
         self.set_mib_initial_values()
         # Objetos auxiliares
@@ -42,7 +42,7 @@ class RequestHandler(threading.Thread):
         self.matrix_update_thread.start()
 
         # Iniciar a Thread que remove chaves expiradas da MIB a cada V segundos
-        self.cleanup_thread = threading.Thread(target=self.clean_expired_thread, args=(V,))
+        self.cleanup_thread = threading.Thread(target=self.clean_expired_thread, args=(5,))
         self.cleanup_thread.start()
 
         # Iniciar a Thread que atualiza o timestamp S da MIB a cada 1 segundo
@@ -104,14 +104,13 @@ class RequestHandler(threading.Thread):
                 answer_pdu = SNMPkeySharePDU(1, 1, auth_code, dec_pdu.request_id, 0, len(values_set), values_set, len(erros), erros)
                 
             enc_answer_pdu = answer_pdu.encode()
-            if len(enc_answer_pdu) > 4096:
+            if len(enc_answer_pdu) > 1500:
                 answer_pdu = SNMPkeySharePDU(1, 1, auth_code, dec_pdu.request_id, 0, 1, [(0,0)], 1, [(0,1)])
                 enc_answer_pdu = answer_pdu.encode()
                 
             print(answer_pdu)
             encrypted_response = self.CYPHER.encrypt(enc_answer_pdu)
             try:
-                print("Sending response message")
                 self.socket.sendto(encrypted_response, addr)
                 print("Response message sent")
             except Exception as e:
@@ -131,15 +130,7 @@ class RequestHandler(threading.Thread):
         possible_oids = ["1.1.1.0", "1.1.2.0", "1.1.3.0", "1.1.4.0", "1.1.5.0", "1.1.6.0", "1.1.7.0", "1.2.1.0", "1.2.2.0", "1.2.3.0"]         #hardcoded but best pratice to maintain SNMP resemblence in this implementation (by not getting errors for non existing OIDs, as ideally the MIB would be iterated oid by oid)
         result = []
         current_string = oid
-        keys = oid.split(".")
-
-        #If you send an SNMP GETNEXT request with an OID that does not exist in the MIB, the SNMP agent will not gather the following OID values lexically.
-        #The SNMP agent will respond with an SNMP error, specifically an "End of MIB View" error (SNMPv2c) or "noSuchObject" error (SNMPv1). This indicates that the requested OID does not exist or that there are no further OIDs available in the MIB that are lexicographically greater than the given OID.
-        #In such a case, the SNMP agent will not gather or return any OID values beyond the non-existent OID. The SNMP manager will receive the error response and handle it accordingly.
-        oid_value = self.mib.get_value(oid, admin=True)
-        if oid_value[1] == -2:
-            #Error 2: OID does not exist
-            return -2                                                            
+        keys = oid.split(".")                   
         
         if count == 0:
             return [oid]
@@ -313,9 +304,6 @@ class RequestHandler(threading.Thread):
             auth_code_received = pdu.security_params_list[0]
             auth_code_calculated = self.calculate_authentication_code(pdu.request_id)
 
-            print("Auth code received: ", auth_code_received)
-            print("Auth code received: ", auth_code_calculated)
-
             auth_code_calculated = auth_code_calculated
             if auth_code_received == auth_code_calculated:
                 # A mensagem é autêntica, continue com o processamento
@@ -333,7 +321,6 @@ class RequestHandler(threading.Thread):
         
         # Verificar se os valores dos tamanho da lista de segurance é coerente com o número de valores de segurança
         if pdu.security_params_num != len(pdu.security_params_list):
-            print(pdu.security_params_num, len(pdu.security_params_list))
             return False, -2
 
         # Verificar se o código de autenticação da mensagem é válido
@@ -384,7 +371,6 @@ class RequestHandler(threading.Thread):
                             if dec_pdu.primitive_type == 1:
                                 print("Get request received")
                                 print(dec_pdu)
-                                print(dec_pdu.security_params_list)
                                 self.get_request(dec_pdu, addr)
                             elif dec_pdu.primitive_type == 2:
                                 print("Set request received")
@@ -442,13 +428,12 @@ class RequestHandler(threading.Thread):
     def update_matrix_thread(self, T):
         T = int(T/1000)   # convert to seconds
         while not self.stop_signal_received:
-            time.sleep(5)
+            time.sleep(T)
             self.update_matrix_afterT()
         print("Matrix Update Thread stopped")
 
 
     def update_matrix_afterT(self):
-
         updated_time = self.keys.update_matrix_Z()
 
         zUpdateDate = updated_time.year * 104 + updated_time.month * 102 + updated_time.day
@@ -507,7 +492,7 @@ class RequestHandler(threading.Thread):
     #! Functions related to timestamp S instance update
     def increment_timestamp_thread(self, seconds):
         while not self.stop_signal_received:
-            time.sleep(5)
+            time.sleep(seconds)
             self.increment_timestamp()
         print("Increment Timestamp Thread stopped")
 
@@ -544,7 +529,6 @@ def read_configuration_file(config_file):
     V = int(config['Other']['V'])
     M = str(config['Other']['M'])
     KEY = str(config['Other']['KEY'])
-    print(KEY)
 
     if(len(M) != 2*K):
         print("Error: M length must be 2K. Check config.ini file.")

@@ -1,27 +1,31 @@
--- snmpKeyShareMib: 1
---      system: 1
---          systemRestartDate: 1
---          systemRestartTime: 2
---          systemKeySize: 3
---          systemIntervalUpdate: 4
---          systemMaxNumberOfKeys: 5
---          systemKeysTimeToLive: 6
---      config: 2
---          configMasterKey: 1
---          configFirstCharOfKeysAlphabet: 2
---          configCardinalityOfKeysAlphabet: 3
---      data: 3
---          dataNumberOfValidKeys: 1
---          dataTableGeneratedKeys: 2
---          dataTableGeneratedKeysEntry: 3
---              keyId: 1
---              keyValue: 2
---              KeyRequester: 3
---              keyExpirationDate: 4
---              keyExpirationTime: 5
---              keyVisibility: 6
+"""
+Autor: Rui Chaves (ruichaves99@gmail.com)
+Descrição: Ficheiro que representa a MIB SNMPkeyShare. Este ficheiro não é utilizado no decorrer do programa mas facilitou a tradução da MIB para o formato JSON.
 
-
+Outras informações relevantes:
+    snmpKeyShareMib: 1
+         system: 1
+             systemRestartDate: 1
+             systemRestartTime: 2
+             systemKeySize: 3
+             systemIntervalUpdate: 4
+             systemMaxNumberOfKeys: 5
+             systemKeysTimeToLive: 6
+         config: 2
+             configMasterKey: 1
+             configFirstCharOfKeysAlphabet: 2
+             configCardinalityOfKeysAlphabet: 3
+         data: 3
+             dataNumberOfValidKeys: 1
+             dataTableGeneratedKeys: 2
+             dataTableGeneratedKeysEntry: 3
+                 keyId: 1
+                 keyValue: 2
+                 KeyRequester: 3
+                 keyExpirationDate: 4
+                 keyExpirationTime: 5
+                 keyVisibility: 6
+"""
 
 
 -- groups in SNMPKEYSHARE
@@ -33,14 +37,14 @@ config OBJECT IDENTIFIER ::= { snmpKeyShareMib 2 }
 keys OBJECT IDENTIFIER ::= { snmpKeyShareMib 3 }
 
 -- the system group
-systemRestartDate OBJECT-TYPE
+zUpdateDate OBJECT-TYPE
     SYNTAX      INTEGER
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION "The date (YY*104+MM*102+DD) when the agent has started a new Z matrix."
     ::= { system 1 }
 
-systemRestartTime OBJECT-TYPE
+zUpdateTime OBJECT-TYPE
     SYNTAX      INTEGER
     MAX-ACCESS  read-only
     STATUS      current

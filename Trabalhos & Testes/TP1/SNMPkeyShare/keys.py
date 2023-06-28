@@ -1,3 +1,8 @@
+"""
+Autor: Rui Chaves (ruichaves99@gmail.com)
+Descrição: Ficheiro que guarda a matriz Z e que permite a atualização da mesma e geração de chaves a pedido.
+"""
+
 import numpy as np
 from datetime import datetime, timedelta
 import threading

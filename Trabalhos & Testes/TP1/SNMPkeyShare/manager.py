@@ -1,3 +1,10 @@
+"""
+Autor: Rui Chaves (ruichaves99@gmail.com)
+Descrição: Ficheiro que representa um gestor e que irá tratar de fazer os diversos pedidos ao agente (geração de chaves, pedido de chaves de outras aplicações, etc), dentro dos permitidos pelo projeto.
+"""
+
+
+
 import sys, os, socket, threading, random, time, configparser, re
 from SNMPkeySharePDU import SNMPkeySharePDU
 from cryptography.fernet import Fernet
@@ -123,7 +130,7 @@ class SNMPManager():
 
     #! Funcao que envia um PDU para o gestor
     def send_request(self, command):
-        if command == "exit":
+        if command == "exit":\
             sys.exit()
         elif command == "1":  command = "snmpkeyshare-set(1, (1.3.3.6.0, 1))"
         elif command == "2":  command = "snmpkeyshare-set(1, (1.3.3.6.0, 2))"
@@ -147,15 +154,12 @@ class SNMPManager():
         try:
             pdu = self.build_pdu(command)
             valid_or_not = self.verify_pdu(pdu)
-            if valid_or_not:
-                print("Valid PDU")
-            elif valid_or_not == 1:
+            if not valid_or_not:
                 print(f"Invalid PDU: Wait a maximum of {self.timeout} seconds before reusing the Request ID {pdu.request_id}.\nTrying again...")  #type: ignore
                 while not self.verify_pdu(pdu):
                     pdu = pdu._replace(request_id = random.randint(0, 1000))  #type: ignore
-                print
-            print(pdu)
-            pdu_encoded = pdu.encode()
+
+            pdu_encoded = pdu.encode()  #type: ignore
             encrypted_pdu = self.cypher.encrypt(pdu_encoded)
             self.socket.sendto(encrypted_pdu, (self.agentIP, self.port))
 

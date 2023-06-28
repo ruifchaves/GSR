@@ -1,13 +1,15 @@
-import configparser, os, json, random, threading, socket, sys, time, datetime
+"""
+Autor: Rui Chaves (ruichaves99@gmail.com)
+Descrição: Ficheiro que representa o agente no sistema e que, como tal, recebe pedidos das diversas aplicações/gestores e os trata devidamente, fornecendo ou não a resposta devida.
+"""
+
+import configparser, os, json, threading, socket, sys, time, datetime
 from SNMPkeySharePDU import SNMPkeySharePDU
 from MIB import SNMPKeyShareMIB
 from keys import Keys
-import numpy as np
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hmac
 from cryptography.hazmat.primitives import hashes
-
-
 
 
 class RequestHandler(threading.Thread):
@@ -32,6 +34,7 @@ class RequestHandler(threading.Thread):
         self.CYPHER = Fernet(self.KEY) #type: Fernet
         self.start_time = start_time
         self.set_mib_initial_values()
+
         # Objetos auxiliares
         self.used_ids = []
         self.addr_pAndTime = {}
@@ -125,9 +128,9 @@ class RequestHandler(threading.Thread):
 
 
     #! GET REQUEST AND AUXILIARY FUNCTIONS
-    # Funcao auxiliar que retorna lista de oids lexicograficamente seguintes (apenas do mesmo grupo - system, config or data, tendo em conta os ids usados na tabela de chaves)
+    #! Funcao auxiliar que retorna lista de oids lexicograficamente seguintes (apenas do mesmo grupo - system, config or data, tendo em conta os ids usados na tabela de chaves)
     def get_next_oids(self, oid, count):
-        possible_oids = ["1.1.1.0", "1.1.2.0", "1.1.3.0", "1.1.4.0", "1.1.5.0", "1.1.6.0", "1.1.7.0", "1.2.1.0", "1.2.2.0", "1.2.3.0"]         #hardcoded but best pratice to maintain SNMP resemblence in this implementation (by not getting errors for non existing OIDs, as ideally the MIB would be iterated oid by oid)
+        possible_oids = ["1.1.1.0", "1.1.2.0", "1.1.3.0", "1.1.4.0", "1.1.5.0", "1.1.6.0", "1.1.7.0", "1.2.1.0", "1.2.2.0", "1.2.3.0"]  #NOTE hardcoded but best pratice to maintain SNMP resemblence in this implementation (by not getting errors for non existing OIDs, as ideally the MIB would be iterated oid by oid)
         result = []
         current_string = oid
         keys = oid.split(".")                   
@@ -142,12 +145,12 @@ class RequestHandler(threading.Thread):
                 parts[-2] = str(int(parts[-2]) + 1)
                 current_string = '.'.join(parts)
                 result.append(current_string)
-                if len(result) == count +1:                         # Check if desired count is reached
+                if len(result) == count +1:
                     break
             result = [item for item in result if item in possible_oids]
         elif oid == "1.3.1.0" or len(keys) == 5:
             if oid == "1.3.1.0":
-                result.append(current_string)                       # Include the given OID in the result list
+                result.append(current_string)
                 current_string = "1.3.3.1.0"
                 
             if int(current_string.split('.')[-1]) in self.used_ids:
@@ -161,7 +164,7 @@ class RequestHandler(threading.Thread):
                     parts = current_string.split('.')
                     parts[-1] = str(self.used_ids[id_index])
                     result.append('.'.join(parts))
-                    id_index = (id_index + 1) % len(self.used_ids)  # Increment index and wrap around if needed
+                    id_index = (id_index + 1) % len(self.used_ids)  # Incrementar o indice e voltar ao inicio se necessário
                     if len(result) == count+1:
                         break
                 parts = current_string.split('.')
@@ -173,8 +176,7 @@ class RequestHandler(threading.Thread):
             result = [item for item in result if not item.endswith('.7.1') and int(item.split('.')[-2]) < 7]
 
         if result == []:
-            #Error 10: No more OIDs past the given one (endOfMIBView)
-            return -10                                                             
+            return -10                                                                            #Error 10: No more OIDs past the given one (endOfMIBView)                                                           
         return result
 
 
@@ -250,7 +252,7 @@ class RequestHandler(threading.Thread):
 
 
     #! Funcao que trata de um pedido do tipo set
-    # Client can only set values to it keyVisibility instance
+    # Client can only set values to its keyVisibility instance(s)
     # Can try for other groups but will get error (including other instances of keys Table)
     def set_request(self, dec_pdu, addr):
         ret = []
@@ -306,11 +308,9 @@ class RequestHandler(threading.Thread):
 
             auth_code_calculated = auth_code_calculated
             if auth_code_received == auth_code_calculated:
-                # A mensagem é autêntica, continue com o processamento
-                return True
+                return True     # A mensagem é autêntica
             else:
-                # A mensagem não é autêntica, trate o caso adequadamente (por exemplo, rejeite a mensagem)
-                return False
+                return False    # A mensagem não é autêntica
 
     #! Funcao que verifica se o PDU recebido é válido, e se não for, retorna um valor de erro que irá ser tratado na função que a chamou
     def verify_pdu(self, pdu, addr):
@@ -336,11 +336,11 @@ class RequestHandler(threading.Thread):
                     if diff_time < self.V:
                         return False, int(self.V - diff_time)
                     else:
-                        addr_requests.remove((p, t))    #Can be removed because have expired and the function will certainly return True
+                        addr_requests.remove((p, t))    # Pode ser removido porque já expirou e a funcao vai retornar True
 
         # Se o PDU for válido, adicionar o ID do PDU à lista de IDs juntamente com o tempo de receção
         if addr not in self.addr_pAndTime:
-            self.addr_pAndTime[addr] = []  # Create an empty list for the address
+            self.addr_pAndTime[addr] = []
         self.addr_pAndTime[addr].append((P, time.time()))
         return True, 0
     
@@ -350,8 +350,8 @@ class RequestHandler(threading.Thread):
 
         def monitor_stop_signal():
             while not self.stop_signal_received:
-                time.sleep(1)  # Check the flag every second
-            self.socket.close()  # Close the socket when the flag is set to True
+                time.sleep(1)    # Verificar a flag a cada segundo
+            self.socket.close()  # Fechar o socket para poder terminar o processo
             print("Socket closed")
 
         monitor_thread = threading.Thread(target=monitor_stop_signal)
@@ -370,11 +370,9 @@ class RequestHandler(threading.Thread):
                         if valid_or_not[0]:
                             if dec_pdu.primitive_type == 1:
                                 print("Get request received")
-                                print(dec_pdu)
                                 self.get_request(dec_pdu, addr)
                             elif dec_pdu.primitive_type == 2:
                                 print("Set request received")
-                                print(dec_pdu)
                                 self.set_request(dec_pdu, addr)
                             else:
                                 print("Invalid SNMP request received")
@@ -386,14 +384,8 @@ class RequestHandler(threading.Thread):
 
                     except Exception as e:
                         print("Exception occurred while processing request:", e)
-                        # Handle the exception here (e.g., log the error, send an error response, etc.)
 
             self.debug()
-            print("passsseii aqui stopped")
-            #self.cleanup_thread.join()
-            #monitor_thread.join()
-            #self.clean_expired_thread.join()
-            #self.update_matrix_thread.join()
 
         except Exception as e:
 
@@ -403,7 +395,7 @@ class RequestHandler(threading.Thread):
             self.socket.close()
 
 
-    # Funcao de debug para guardar a MIB num ficheiro json
+    #! Funcao de debug para guardar a MIB num ficheiro json
     def debug(self):
         json.dump(self.mib.mib, open("debug/MIB_debug.json", "w")) #type: ignore
         print("MIB saved to debug/MIB_debug.json")
@@ -426,7 +418,7 @@ class RequestHandler(threading.Thread):
 
     #! Funcao que faz update da matrix Z a cada T segundos e guarda o timestamp na MIB
     def update_matrix_thread(self, T):
-        T = int(T/1000)   # convert to seconds
+        T = int(T/1000)   # converter para segundos
         while not self.stop_signal_received:
             time.sleep(T)
             self.update_matrix_afterT()
@@ -445,21 +437,17 @@ class RequestHandler(threading.Thread):
 
 
 
-
-
     #! Functions related to key cleanup
     def decrease_dataNumberOfValidKeys(self):
-        new_value = int(self.mib.get_value("1.3.1.0", True)[1]) - 1     #type: ignore
+        new_value = int(self.mib.get_value("1.3.1.0", True)[1]) - 1   #type: ignore
         self.mib.set_value("1.3.1.0", new_value, admin=True)
 
     def compare_to_datetime(self, keyExpirationDate, keyExpirationTime):
-        # Get current date and time
         cur_datetime = datetime.datetime.now()
 
         cur_date = cur_datetime.year * 104 + cur_datetime.month * 102 + cur_datetime.day
         cur_time = cur_datetime.hour * 104 + cur_datetime.minute * 102 + cur_datetime.second
 
-        # Compare expiration_datetime to current_datetime
         if keyExpirationDate < cur_date:                                        # Key has expired
             return True         
         elif keyExpirationDate == cur_date and keyExpirationTime < cur_time:    # Key has expired
@@ -487,8 +475,6 @@ class RequestHandler(threading.Thread):
 
 
 
-
-
     #! Functions related to timestamp S instance update
     def increment_timestamp_thread(self, seconds):
         while not self.stop_signal_received:
@@ -496,8 +482,8 @@ class RequestHandler(threading.Thread):
             self.increment_timestamp()
         print("Increment Timestamp Thread stopped")
 
-    # by not incrementing by X seconds, we can have a more precise timestamp
-    def increment_timestamp(self):
+    
+    def increment_timestamp(self):                                              #NOTE: by not incrementing by X seconds, we can have a more precise timestamp
         now = time.time()
         new = int(now - self.start_time)
         self.mib.set_value("1.1.7.0", new, admin=True)
@@ -537,8 +523,6 @@ def read_configuration_file(config_file):
     return IP, PORT, K, T, X, V, M, KEY
 
 
-
-
 def main():
     os.system('cls' if os.name == 'nt' else 'clear')
     print("A Inicializar agente SNMP...")
@@ -560,12 +544,11 @@ def main():
 
     except KeyboardInterrupt:
         # Gracefully close the agent
-        print("Stopping RequestHandler...")
+        print("\nStopping RequestHandler...")
         rH.debug()
         rH.stop_signal_received = True
         #rH.join()   # Wait for the RequestHandler thread to finish
         print("Stopping...")
-        #sys.exit(0)
 
 
 if __name__ == '__main__':

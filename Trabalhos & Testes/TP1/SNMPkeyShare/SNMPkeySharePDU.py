@@ -1,26 +1,31 @@
-# 1. S - Identificação do modelo de segurança – Número inteiro que identificará quais os mecanismos
-#       de segurança a utilizar; se for igual a zero então não se aplicam mecanismos de segurança (neste
-#       trabalho o único valor de S válido é zero);
-# 2. Ns - Número de parâmetros necessários à implementação dos mecanismos de segurança – Se S
-#       for igual a zero então NS também é obrigatoriamente igual a zero;
-# 3. Q - Lista dos parâmetros necessários à implementação dos mecanismos de segurança – O tipo
-#       de parâmetros depende do modelo de segurança; se S e NS forem iguais a zero, então Q é uma
-#       lista vazia;
-# 4. P - Identificação do pedido – Número inteiro (ver explicação das primitivas);
-# 5. Y - Identificação do tipo de primitiva – Um número inteiro que identifica um dos três tipos de
-#       primitivas possíveis (0 = response, 1 = get, 2 = set);
-# 6. Nl ou Nw - Número de elementos da lista de instâncias e valores associados – Número inteiro
-#       que indica a quantidade de pares duma lista L (primitiva get) ou duma lista W (primitiva set ou
-#       primitiva response);
-# 7. L ou W - Lista de instâncias e valores associados – Lista L (primitiva get) ou lista W (primitiva
-#       set ou response); esta lista é formada por pares de valores (I-ID,H ou N) (ver explicação das
-#       primitivas);
-# 8. Nr - Número de elementos da lista de erros – Número inteiro que indica a quantidade de erros
-#       reportados na primitiva (ver explicação das primitivas) através da lista R;
-# 9. R - Lista de erros e valores associados – A lista R inclui todos os erros encontrados durante o
-#       processo de processamento do pedido P no agente (ver explicação das primitivas); no caso das
-#       primitivas get temos Nr = 1, I-ID = 0 e E = 0.
+"""
+Autor: Rui Chaves (ruichaves99@gmail.com)
+Descrição: Ficheiro que permite construir e desconstruir um PDU que irá servir de base de comunicação entre agente e gestores.
 
+Outras informações relevantes:
+    1. S - Identificação do modelo de segurança - Número inteiro que identificará quais os mecanismos
+        de segurança a utilizar; se for igual a zero então não se aplicam mecanismos de segurança (neste
+        trabalho o único valor de S válido é zero);
+    2. Ns - Número de parâmetros necessários à implementação dos mecanismos de segurança - Se S
+        for igual a zero então NS também é obrigatoriamente igual a zero;
+    3. Q - Lista dos parâmetros necessários à implementação dos mecanismos de segurança - O tipo
+        de parâmetros depende do modelo de segurança; se S e NS forem iguais a zero, então Q é uma
+        lista vazia;
+    4. P - Identificação do pedido - Número inteiro (ver explicação das primitivas);
+    5. Y - Identificação do tipo de primitiva - Um número inteiro que identifica um dos três tipos de
+        primitivas possíveis (0 = response, 1 = get, 2 = set);
+    6. Nl ou Nw - Número de elementos da lista de instâncias e valores associados - Número inteiro
+        que indica a quantidade de pares duma lista L (primitiva get) ou duma lista W (primitiva set ou
+        primitiva response);
+    7. L ou W - Lista de instâncias e valores associados - Lista L (primitiva get) ou lista W (primitiva
+        set ou response); esta lista é formada por pares de valores (I-ID,H ou N) (ver explicação das
+        primitivas);
+    8. Nr - Número de elementos da lista de erros - Número inteiro que indica a quantidade de erros
+        reportados na primitiva (ver explicação das primitivas) através da lista R;
+    9. R - Lista de erros e valores associados - A lista R inclui todos os erros encontrados durante o
+        processo de processamento do pedido P no agente (ver explicação das primitivas); no caso das
+        primitivas get temos Nr = 1, I-ID = 0 e E = 0.
+"""
 
 class SNMPkeySharePDU:
     # PDU Constructor
@@ -79,16 +84,15 @@ class SNMPkeySharePDU:
 
         instances_values_str = '\n                             '.join([f"({instance[0]}, {instance[1]})" for instance in self.instances_values])
 
-
-        errors_list = [ f"({err[0]}, {err[1]}: noError)"                                            if int(err[1]) == 0 else 
-                        f"({err[0]}, Error {err[1]}: tooBig)"                                       if int(err[1]) == 1 else 
-                        f"({err[0]}, Error {err[1]}: noSuchName)"                                   if int(err[1]) == 2 else
-                        f"({err[0]}, Error {err[1]}: badValue)"                                     if int(err[1]) == 3 else
-                        f"({err[0]}, Error {err[1]}: readOnly)"                                     if int(err[1]) == 4 else
-                        f"({err[0]}, Error {err[1]}: noAccess)"                                     if int(err[1]) == 6 else
-                        f"({err[0]}, Error {err[1]}: Key value is not visible)"                     if int(err[1]) == 8 else
-                        f"({err[0]}, Error {err[1]}: Key value is only visible to the requester)"   if int(err[1]) == 9 else
-                        f"({err[0]}, Error {err[1]}: endOfMIBView)"                                 if int(err[1]) == 10 else
+        errors_list = [ f"({err[0]}, {err[1]}: noError)"                                      if int(err[1]) == 0 else 
+                        f"({err[0]}, {err[1]}: tooBig)"                                       if int(err[1]) == 1 else 
+                        f"({err[0]}, {err[1]}: noSuchName)"                                   if int(err[1]) == 2 else
+                        f"({err[0]}, {err[1]}: badValue)"                                     if int(err[1]) == 3 else
+                        f"({err[0]}, {err[1]}: readOnly)"                                     if int(err[1]) == 4 else
+                        f"({err[0]}, {err[1]}: noAccess)"                                     if int(err[1]) == 6 else
+                        f"({err[0]}, {err[1]}: Key value is not visible)"                     if int(err[1]) == 8 else
+                        f"({err[0]}, {err[1]}: Key value is only visible to the requester)"   if int(err[1]) == 9 else
+                        f"({err[0]}, {err[1]}: endOfMIBView)"                                 if int(err[1]) == 10 else
                         f"({err[0]}, {err[1]}: genErr)"                     for err in self.errors]
         errors_list_str = "                             ".join([error + "\n" for error in errors_list])
 

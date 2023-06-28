@@ -17,24 +17,27 @@ class Keys:
         #NOTE: ensure that update_matrix_Z() and generate_key() do not run simultaneously and interfere with each other
         self.matrix_updating_lock = threading.Lock()
 
-
+    # Funcao que da rotate a uma linha da matriz n vezes
     def rotate(self, seq, n):
         return np.roll(seq, n)
 
+    # Funcao que transpoe uma linha da matriz
     def transpose(self, seq):
         return seq.T
 
+    # Funcao que gera um numero aleatorio entre min_val e max_val com um valor de seed
     def random(self, seed, min_val, max_val):
         np.random.seed(seed)
         return np.random.randint(min_val, max_val + 1)
 
+    # Funcao que implementa o XOR entre n arrays
     def xor(self, *args):
-        result = args[0]
+        result = args[0] #type: ignore
         for arg in args[1:]:
             result = np.bitwise_xor(result, arg)
         return result
 
-
+    # Funcao que gera a matriz Z, recorre a funcao rotate e random
     def generate_matrix_Z(self):
         M1 = self.M[:self.K]
         M2 = self.M[self.K:]
@@ -48,12 +51,8 @@ class Keys:
         Z = self.xor(ZA, ZB, ZC, ZD)
         return Z
 
-
-
-
+    # Funcao que gera uma chave com base na matriz Z
     def generate_key(self, firstChar=33, numChars=94):
-        #while self.matrix_updating:
-        #    pass
         with self.matrix_updating_lock:
             i = self.random(self.update_count + self.Z[0, 0], 0, self.K - 1)
             j = self.random(self.Z[i, 0], 0, self.K - 1)
@@ -64,6 +63,7 @@ class Keys:
             return C, datetime.now() + timedelta(seconds=self.V)
 
 
+    # Funcao que atualiza a matriz Z e retorna o tempo de atualizacao
     def update_matrix_Z(self):
         with self.matrix_updating_lock:
             self.matrix_updating = True

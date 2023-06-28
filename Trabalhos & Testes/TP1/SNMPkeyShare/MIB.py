@@ -93,7 +93,7 @@ class SNMPKeyShareMIB:
 
         if max_access == "read-only" and not admin:
             print("OID is read-only")
-            return (oid, -7)                                                #Error 4: OID is read-only (wrongType)
+            return (oid, -4)                                                #Error 4: OID is read-only (readOnly)
         elif max_access == "not-accessible" and not admin:
             print("OID not accessible")                                     
             return (oid, -6)                                                #Error 6: OID not accessible (noAccess)

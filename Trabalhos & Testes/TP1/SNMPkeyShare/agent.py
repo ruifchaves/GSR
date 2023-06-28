@@ -3,16 +3,23 @@ from SNMPkeySharePDU import SNMPkeySharePDU
 from MIB import SNMPKeyShareMIB
 from keys import Keys
 import numpy as np
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hmac
+from cryptography.hazmat.primitives import hashes
+
 
 
 
 class RequestHandler(threading.Thread):
-    def __init__(self, IP, PORT, K, T, X, V, M, start_time):
+    def __init__(self, IP, PORT, K, T, X, V, M, KEY, start_time):
         threading.Thread.__init__(self)
 
+        # Iniciar o socket UDP (removendo o timeout)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((IP, PORT))
         self.socket.settimeout(None)
+
+        # Iniciar a MIB, Keys e outras variaveis
         self.port = PORT
         self.mib = SNMPKeyShareMIB()
         self.keys = Keys(M, K, V)
@@ -21,21 +28,24 @@ class RequestHandler(threading.Thread):
         self.X = X
         self.V = V
         self.M = M
+        self.KEY = KEY.encode()
+        self.CYPHER = Fernet(self.KEY)
         self.start_time = start_time
         self.set_mib_initial_values()
+        # Objetos auxiliares
         self.used_ids = []
         self.addr_pAndTime = {}
         self.stop_signal_received = False
 
-        # Start the matrix update thread
-        self.matrix_update_thread = threading.Thread(target=self.update_matrix_thread, args=(20000,)) #TOOO remover this
+        # Iniciar a Thread que a atualiza a Matriz a cada T/1000 segundos
+        self.matrix_update_thread = threading.Thread(target=self.update_matrix_thread, args=(T,))
         self.matrix_update_thread.start()
 
-        # Start the cleanup thread
+        # Iniciar a Thread que remove chaves expiradas da MIB a cada V segundos
         self.cleanup_thread = threading.Thread(target=self.clean_expired_thread, args=(V,))
         self.cleanup_thread.start()
 
-        # Start the update timestamp thread
+        # Iniciar a Thread que atualiza o timestamp S da MIB a cada 1 segundo
         self.increase_timestamp_thread = threading.Thread(target=self.increment_timestamp_thread, args=(1,))
         self.increase_timestamp_thread.start()
 
@@ -43,7 +53,7 @@ class RequestHandler(threading.Thread):
         self.gen_and_updateZ_atomicity_lock = threading.Lock()
 
 
-    # function to update initial values
+    #! Funcao que atualiza os valores iniciais da MIB com os valores do ficheiro de configuracao
     def set_mib_initial_values(self):
         print("Setting initial values...")
         self.mib.set_value("1.1.1.0", 1,      True)
@@ -57,12 +67,15 @@ class RequestHandler(threading.Thread):
         self.mib.set_value("1.2.2.0", 33,     True)
         self.mib.set_value("1.2.3.0", 94,     True)
         self.mib.set_value("1.3.1.0", 0,      True)
+        self.update_matrix_afterT()
         print("Initial values set!")
 
 
 
+
+
     #! SEND RESPONSE AND AUXILIARY FUNCTIONS
-    # Funcao que divide (IID, valor) em (IID, valor) e (IID, error_code)
+    #! Funcao que divide (IID, valor) em (IID, valor) e (IID, error_code)
     def sort_errors_from_instance(self, ret):
         error = []
         errors_to_remove = []
@@ -77,23 +90,29 @@ class RequestHandler(threading.Thread):
 
         return ret, error
 
-    # Funcao que envia resposta ao pedido
+    #! Funcao que envia uma resposta a um pedido
     def send_response(self, dec_pdu, addr, ret):
         print("Creating Response Message")
         try:
+            auth_code = [self.calculate_authentication_code(dec_pdu.request_id)]
             values_set, erros = self.sort_errors_from_instance(ret)
             if len(values_set) == 0:
-                answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, 1, [(0,0)], len(erros), erros)
+                answer_pdu = SNMPkeySharePDU(1, 1, auth_code, dec_pdu.request_id, 0, 1, [(0,0)], len(erros), erros)
             elif len(erros) == 0:
-                answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, 1, [(0,0)])
+                answer_pdu = SNMPkeySharePDU(1, 1, auth_code, dec_pdu.request_id, 0, len(values_set), values_set, 1, [(0,0)])
             else:
-                answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, len(erros), erros)
+                answer_pdu = SNMPkeySharePDU(1, 1, auth_code, dec_pdu.request_id, 0, len(values_set), values_set, len(erros), erros)
+                
+            enc_answer_pdu = answer_pdu.encode()
+            if len(enc_answer_pdu) > 4096:
+                answer_pdu = SNMPkeySharePDU(1, 1, auth_code, dec_pdu.request_id, 0, 1, [(0,0)], 1, [(0,1)])
+                enc_answer_pdu = answer_pdu.encode()
                 
             print(answer_pdu)
-            enc_answer_pdu = answer_pdu.encode()
+            encrypted_response = self.CYPHER.encrypt(enc_answer_pdu)
             try:
                 print("Sending response message")
-                self.socket.sendto(enc_answer_pdu, addr)
+                self.socket.sendto(encrypted_response, addr)
                 print("Response message sent")
             except Exception as e:
                 print("Unable to send Response Message: ", e)
@@ -119,8 +138,8 @@ class RequestHandler(threading.Thread):
         #In such a case, the SNMP agent will not gather or return any OID values beyond the non-existent OID. The SNMP manager will receive the error response and handle it accordingly.
         oid_value = self.mib.get_value(oid, admin=True)
         if oid_value[1] == -2:
-            print(-2)
-            return -2                                                            #Error 2: OID does not exist
+            #Error 2: OID does not exist
+            return -2                                                            
         
         if count == 0:
             return [oid]
@@ -163,14 +182,14 @@ class RequestHandler(threading.Thread):
             result = [item for item in result if not item.endswith('.7.1') and int(item.split('.')[-2]) < 7]
 
         if result == []:
-            print(-10)
-            return -10                                                             #Error 10: No more OIDs past the given one (endOfMIBView)
+            #Error 10: No more OIDs past the given one (endOfMIBView)
+            return -10                                                             
         return result
 
 
     #! Funcao que trata de um pedido do tipo get
     # Client can get values from system and data groups (except keyValue if keyVisibility 0 or not same client and keyVisibility 1)
-    # Admin can get values from all groups (except if non-accessible)
+    # Admin can get values from all groups
     def get_request(self, dec_pdu, addr):
         ret = []
         for tuple in dec_pdu.instances_values:
@@ -208,10 +227,7 @@ class RequestHandler(threading.Thread):
 
 
 
-
-
-
-   #! Auxiliary function: Spits out available Key ID
+   #! Função Auxiliar: Retorna o primeiro id disponivel
     def get_unused_number(self):
         for i in range(1, self.X+1):
             if i not in self.used_ids:
@@ -219,6 +235,7 @@ class RequestHandler(threading.Thread):
         return None
 
 
+   #! Função que adiciona as instancias correspondentes a uma nova chave à MIB
     def add_key_entry(self, keyValue, keyRequester, keyExpirationDate, keyExpirationTime, keyVisibility):
         result = []
         keyID = self.get_unused_number()
@@ -244,18 +261,16 @@ class RequestHandler(threading.Thread):
     #! Funcao que trata de um pedido do tipo set
     # Client can only set values to it keyVisibility instance
     # Can try for other groups but will get error (including other instances of keys Table)
-    # Admin can set values to all groups (except if non-accessible)
     def set_request(self, dec_pdu, addr):
         ret = []
         for tuple in dec_pdu.instances_values:
-
             W_oid, W_value = tuple
-            if W_oid == "1.3.3.6.0":                                       #! Request to generate new key
+
+            #! Pedido para gerar uma nova chave
+            if W_oid == "1.3.3.6.0":                                       
                     firstChar = self.mib.get_value("1.2.2.0", admin=True)[1]
                     numChars  = self.mib.get_value("1.2.3.0", admin=True)[1]
 
-                    #while self.mib.updating_matrix:
-                    #    pass
                     with self.gen_and_updateZ_atomicity_lock:
                         key, key_expiration = self.keys.generate_key(firstChar, numChars) # type: ignore
                         self.update_matrix_afterT()
@@ -265,13 +280,15 @@ class RequestHandler(threading.Thread):
 
                     ret += self.add_key_entry(key, addr[0], key_exp_date_formatted, key_exp_time_formatted, int(W_value))
             
-            elif W_oid.startswith("1.3.3.6."):                             #! Request to change current key visibility
+            #! Pedido para alterar a visibilidade de uma chave
+            elif W_oid.startswith("1.3.3.6."):                             
                 keyID = int(W_oid.split(".")[-1])
                 instance_addr = self.mib.get_value(f"1.3.3.3.{keyID}")[1]
                 if instance_addr == addr[0]:
                     ret.append(self.mib.set_value(W_oid, int(W_value)))
 
-            else:                                                           #! Other requests 
+            #! Outro pedido qualquer
+            else:
                 ret.append(self.mib.set_value(W_oid, W_value))
             
         if ret:
@@ -280,11 +297,50 @@ class RequestHandler(threading.Thread):
 
 
 
+
+    #! Funcao que calcula o MAC (Message Authentication Code) de uma mensagem
+    def calculate_authentication_code(self, P):
+        id = str(P).encode()  # Converte o identificador do PDU para bytes
+        
+        hmac_alg = hmac.HMAC(self.KEY, hashes.SHA256())
+        hmac_alg.update(id)
+        authentication_code = hmac_alg.finalize()
+        return str(authentication_code)[2:-1]
+
+    #! Funcao que verifica se a mensagem recebida é autêntica
+    def verify_authentication(self, pdu):
+        if pdu.security_model == 1:
+            auth_code_received = pdu.security_params_list[0]
+            auth_code_calculated = self.calculate_authentication_code(pdu.request_id)
+
+            print("Auth code received: ", auth_code_received)
+            print("Auth code received: ", auth_code_calculated)
+
+            auth_code_calculated = auth_code_calculated
+            if auth_code_received == auth_code_calculated:
+                # A mensagem é autêntica, continue com o processamento
+                return True
+            else:
+                # A mensagem não é autêntica, trate o caso adequadamente (por exemplo, rejeite a mensagem)
+                return False
+
+    #! Funcao que verifica se o PDU recebido é válido, e se não for, retorna um valor de erro que irá ser tratado na função que a chamou
     def verify_pdu(self, pdu, addr):
         P = pdu.request_id
+        # Verificar se os valores dos tamanho da lista de instancias é coerente com o número de instâncias
         if pdu.num_instances != len(pdu.instances_values):
-            return False, -1
+            return False, -1        
+        
+        # Verificar se os valores dos tamanho da lista de segurance é coerente com o número de valores de segurança
+        if pdu.security_params_num != len(pdu.security_params_list):
+            print(pdu.security_params_num, len(pdu.security_params_list))
+            return False, -2
 
+        # Verificar se o código de autenticação da mensagem é válido
+        if not self.verify_authentication(pdu):
+            return False, -3
+        
+        # Verificar se o ID do pedido é válido (não foi repetido nos últimos V segundos; removendo os que já expiraram)
         if addr in self.addr_pAndTime:
             addr_requests = self.addr_pAndTime[addr]
             for p, t in addr_requests:
@@ -295,11 +351,12 @@ class RequestHandler(threading.Thread):
                     else:
                         addr_requests.remove((p, t))    #Can be removed because have expired and the function will certainly return True
 
+        # Se o PDU for válido, adicionar o ID do PDU à lista de IDs juntamente com o tempo de receção
         if addr not in self.addr_pAndTime:
             self.addr_pAndTime[addr] = []  # Create an empty list for the address
         self.addr_pAndTime[addr].append((P, time.time()))
-
         return True, 0
+    
 
     #! Funcao que recebe um pedido, valida-o e delega o processamento para a funcao correspondente consoante o tipo de pedido
     def run(self):
@@ -307,7 +364,6 @@ class RequestHandler(threading.Thread):
         def monitor_stop_signal():
             while not self.stop_signal_received:
                 time.sleep(1)  # Check the flag every second
-            #self.socket.shutdown(socket.SHUT_RDWR)
             self.socket.close()  # Close the socket when the flag is set to True
             print("Socket closed")
 
@@ -321,12 +377,14 @@ class RequestHandler(threading.Thread):
                 data, addr = self.socket.recvfrom(4096)
                 if data and addr[1] == self.port:
                     try:
-                        dec_pdu = SNMPkeySharePDU.decode(data.decode())
+                        decrypted_data = self.CYPHER.decrypt(data)
+                        dec_pdu = SNMPkeySharePDU.decode(decrypted_data.decode())
                         valid_or_not = self.verify_pdu(dec_pdu, addr)
                         if valid_or_not[0]:
                             if dec_pdu.primitive_type == 1:
                                 print("Get request received")
                                 print(dec_pdu)
+                                print(dec_pdu.security_params_list)
                                 self.get_request(dec_pdu, addr)
                             elif dec_pdu.primitive_type == 2:
                                 print("Set request received")
@@ -393,11 +451,11 @@ class RequestHandler(threading.Thread):
 
         updated_time = self.keys.update_matrix_Z()
 
-        systemRestartDate = updated_time.year * 104 + updated_time.month * 102 + updated_time.day
-        systemRestartTime = updated_time.hour * 104 + updated_time.minute * 102 + updated_time.second
+        zUpdateDate = updated_time.year * 104 + updated_time.month * 102 + updated_time.day
+        zUpdateTime = updated_time.hour * 104 + updated_time.minute * 102 + updated_time.second
 
-        self.mib.set_value("1.1.1.0", systemRestartDate, admin=True)
-        self.mib.set_value("1.1.1.0", systemRestartTime, admin=True)
+        self.mib.set_value("1.1.1.0", zUpdateDate, admin=True)
+        self.mib.set_value("1.1.1.0", zUpdateTime, admin=True)
         print("Updated matrix Z")
 
 
@@ -485,12 +543,14 @@ def read_configuration_file(config_file):
     X = int(config['Other']['X'])
     V = int(config['Other']['V'])
     M = str(config['Other']['M'])
+    KEY = str(config['Other']['KEY'])
+    print(KEY)
 
     if(len(M) != 2*K):
         print("Error: M length must be 2K. Check config.ini file.")
         sys.exit(1)
 
-    return IP, PORT, K, T, X, V, M
+    return IP, PORT, K, T, X, V, M, KEY
 
 
 
@@ -499,9 +559,9 @@ def main():
     os.system('cls' if os.name == 'nt' else 'clear')
     print("A Inicializar agente SNMP...")
 
-    IP, PORT, K, T, X, V, M = read_configuration_file("config.ini")
+    IP, PORT, K, T, X, V, M, KEY = read_configuration_file("config.ini")
     start = time.time()
-    rH = RequestHandler(IP, PORT, K, T, X, V, M, start)
+    rH = RequestHandler(IP, PORT, K, T, X, V, M, KEY, start)
 
     try:
         rH.daemon = True

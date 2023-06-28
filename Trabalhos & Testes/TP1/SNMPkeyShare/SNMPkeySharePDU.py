@@ -37,9 +37,12 @@ class SNMPkeySharePDU:
     
     # Encodes a PDU to a string
     def encode(self):
+        print("PDU", self.security_params_list)
+        security_params_str = '\x00'.join(self.security_params_list)
+        print("PDU", security_params_str)
         instances_values_str = '\x00'.join([f"{instance[0]}\x00{instance[1]}" for instance in self.instances_values])
         errors_str =           '\x00'.join([f"{err[0]}\x00{err[1]}" for err in self.errors])
-        pdu_string = f"{self.security_model}\x00{self.security_params_num}\x00{self.security_params_list}\x00{self.request_id}\x00{self.primitive_type}\x00{self.num_instances}\x00{instances_values_str}\x00{self.num_errors}\x00{errors_str}\x00"
+        pdu_string = f"{self.security_model}\x00{self.security_params_num}\x00{security_params_str}\x00{self.request_id}\x00{self.primitive_type}\x00{self.num_instances}\x00{instances_values_str}\x00{self.num_errors}\x00{errors_str}\x00"
         return pdu_string.encode()
     
     # Decodes a PDU from a string
@@ -48,22 +51,21 @@ class SNMPkeySharePDU:
         pdu_fields = pdu_string.split("\x00")
         security_model = int(pdu_fields[0])
         security_params_num = int(pdu_fields[1])
-        security_params_list = pdu_fields[2]
-        request_id = int(pdu_fields[3])
-        primitive_type = int(pdu_fields[4])
-        num_instances = int(pdu_fields[5])
-
+        security_params_list = pdu_fields[2:2+security_params_num]
+        request_id = int(pdu_fields[2+security_params_num])
+        primitive_type = int(pdu_fields[3+security_params_num])
+        num_instances = int(pdu_fields[4+security_params_num])
 
         # Decode instances_values as a list of tuples
         instances_values = [
-            (pdu_fields[i], pdu_fields[i+1]) for i in range(6, 6 + num_instances * 2, 2)
+            (pdu_fields[i], pdu_fields[i+1]) for i in range(5+security_params_num, 5+security_params_num + num_instances * 2, 2)
         ]
 
-        num_errors = int(pdu_fields[6 + num_instances * 2])
-        
+        num_errors = int(pdu_fields[5+security_params_num + num_instances * 2])
+
         # Decode errors as a list of tuples
         errors = [
-            (pdu_fields[i], pdu_fields[i+1]) for i in range(7 + num_instances * 2, 7 + num_instances * 2 + num_errors * 2, 2)
+            (pdu_fields[i], pdu_fields[i+1]) for i in range(6+security_params_num + num_instances * 2, 6+security_params_num + num_instances * 2 + num_errors * 2, 2)
         ]
         
         return SNMPkeySharePDU(security_model, security_params_num, security_params_list, request_id, primitive_type, num_instances, instances_values, num_errors, errors)
@@ -80,19 +82,16 @@ class SNMPkeySharePDU:
         instances_values_str = '\n                             '.join([f"({instance[0]}, {instance[1]})" for instance in self.instances_values])
 
 
-        errors_list = [ f"({err[0]}, {err[1]}: noError)"            if err[1] == "0" else 
-                        f"({err[0]}, Error {err[1]}: tooBig)"       if err[1] == "1" else 
-                        f"({err[0]}, Error {err[1]}: noSuchName)"   if err[1] == "2" else
-                        f"({err[0]}, Error {err[1]}: badValue)"     if err[1] == "3" else
-                        f"({err[0]}, Error {err[1]}: readOnly)"     if err[1] == "4" else
-                        f"({err[0]}, Error {err[1]}: genErr)"       if err[1] == "5" else
-                        f"({err[0]}, Error {err[1]}: noAccess)"     if err[1] == "6" else
-                        f"({err[0]}, Error {err[1]}: wrongType)"    if err[1] == "7" else
-                        f"({err[0]}, Error {err[1]}: Key value is not visible)" if err[1] == "8" else
-                        f"({err[0]}, Error {err[1]}: Key value is only visible to the requester)" if err[1] == "9" else
-                        f"({err[0]}, Error {err[1]}: endOfMIBView)" if err[1] == "10" else
-                        f"({err[0]}, {err[1]})"                     for err in self.errors]
-        #errors_list_str = "                     ".join(errors_list)
+        errors_list = [ f"({err[0]}, {err[1]}: noError)"                                            if int(err[1]) == 0 else 
+                        f"({err[0]}, Error {err[1]}: tooBig)"                                       if int(err[1]) == 1 else 
+                        f"({err[0]}, Error {err[1]}: noSuchName)"                                   if int(err[1]) == 2 else
+                        f"({err[0]}, Error {err[1]}: badValue)"                                     if int(err[1]) == 3 else
+                        f"({err[0]}, Error {err[1]}: readOnly)"                                     if int(err[1]) == 4 else
+                        f"({err[0]}, Error {err[1]}: noAccess)"                                     if int(err[1]) == 6 else
+                        f"({err[0]}, Error {err[1]}: Key value is not visible)"                     if int(err[1]) == 8 else
+                        f"({err[0]}, Error {err[1]}: Key value is only visible to the requester)"   if int(err[1]) == 9 else
+                        f"({err[0]}, Error {err[1]}: endOfMIBView)"                                 if int(err[1]) == 10 else
+                        f"({err[0]}, {err[1]}: genErr)"                     for err in self.errors]
         errors_list_str = "                             ".join([error + "\n" for error in errors_list])
 
 

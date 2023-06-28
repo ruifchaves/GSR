@@ -1,9 +1,11 @@
 import sys, os, socket, threading, random, time, configparser, re
 from SNMPkeySharePDU import SNMPkeySharePDU
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes, hmac
 
 
 class SNMPManager():
-    def __init__(self, agentIP, snmpport, V):
+    def __init__(self, agentIP, snmpport, V, KEY):
         self.timeout = V #segundos
         self.p_time = {}
 
@@ -11,6 +13,8 @@ class SNMPManager():
         self.agentIP = agentIP
         self.port = snmpport
         self.p_id_key = {}
+        self.key = KEY.encode()
+        self.cypher = Fernet(self.key)
 
         #self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.setIP()
@@ -45,22 +49,30 @@ class SNMPManager():
         command = input("Introduza o comando: ")
         self.send_request(command)
     
-    # Build PDU from specified command and its parameters
+
+    #! Funcao que calcula o MAC (Message Authentication Code) de uma mensagem
+    def calculate_authentication_code(self, P):
+        id = str(P).encode()  # Converte o identificador do PDU para bytes
+
+        hmac_alg = hmac.HMAC(self.key, hashes.SHA256())
+        hmac_alg.update(id)
+        authentication_code = hmac_alg.finalize()
+
+        return str(authentication_code)[2:-1]
+
+
+    #! Funcao que constroi um PDU a partir de um comando
     def build_pdu(self, command):
         try:
-            if("get" in command):
+            if "get" in command:
                 Y = 1
-            elif("set" in command):
+            elif "set" in command:
                 Y = 2
-
 
             # Parse do comando
             substring = command[command.find("(") + 1: command.find(")")]
             values = substring.split(",")
             
-            
-            #! DEBUG
-            #P = int(values[0])
             P = random.randint(0, 1000)
             Nl_Nw = int(values[0])
 
@@ -68,7 +80,9 @@ class SNMPManager():
             pairs = re.findall(r'\((\d.\d.\d.(?:\d.)?\d),\s?(\d+)\)', command)
             tuple_list = [(x, y) for x, y in pairs]
 
-            pdu = SNMPkeySharePDU(0, 0, [], P, Y, Nl_Nw, tuple_list, 1, [(0,0)])                    #type: ignore
+            auth_code = [self.calculate_authentication_code(P)]
+
+            pdu = SNMPkeySharePDU(1, len(auth_code), auth_code, P, Y, Nl_Nw, tuple_list, 1, [(0,0)])                    #type: ignore
             return pdu
         except:
             print("Invalid Command")
@@ -76,6 +90,7 @@ class SNMPManager():
             self.waitForCommand()
 
     
+    #! Funcao que verifica se o ID P do PDU é válido
     # Verify if PDU is valid (more specifically its ID P, all other fields are assumed to be valid and later verified by the agent, ignoring the invalid messages)
     def verify_pdu(self, pdu):
         P = pdu.request_id
@@ -85,14 +100,12 @@ class SNMPManager():
             # "aconselhável que o gestor não utilize valores para P repetidos num intervalo temporal muito maior que V segundos": self.timeout*3
             if diff_time < (self.timeout *3) :
                 return False
-                
-            
 
         self.p_time[P] = time.time()
         return True
 
 
-    # Send PDU to agent
+    #! Funcao que envia um PDU para o gestor
     def send_request(self, command):
         if command == "exit":
             sys.exit()
@@ -118,7 +131,9 @@ class SNMPManager():
                     pdu = pdu._replace(request_id = random.randint(0, 1000))  #type: ignore
             print(pdu)
             pdu_encoded = pdu.encode()
-            self.socket.sendto(pdu_encoded, (self.agentIP, self.port))
+            print(pdu_encoded)
+            encrypted_pdu = self.cypher.encrypt(pdu_encoded)
+            self.socket.sendto(encrypted_pdu, (self.agentIP, self.port))
 
         except Exception as e:
             print("Unable to send Message:\n", e)
@@ -129,6 +144,25 @@ class SNMPManager():
         self.get_response()
 
 
+
+
+
+
+    #! Funcao que verifica se a mensagem recebida é autêntica
+    def verify_authentication(self, pdu):
+        if pdu.security_model == 1:
+            auth_code_received = pdu.security_params_list[0]
+            auth_code_calculated = self.calculate_authentication_code(pdu.request_id)
+
+            auth_code_calculated = auth_code_calculated
+            if auth_code_received == auth_code_calculated:
+                # A mensagem é autêntica, continue com o processamento
+                return True
+            else:
+                # A mensagem não é autêntica, trate o caso adequadamente (por exemplo, rejeite a mensagem)
+                return False
+
+    #! Funcao que recebe um PDU do gestor
     def get_response(self):
         try:
             # NOTE: "não é obrigatório que o agente responda, nem que responda num intervalo de tempo qualquer, nem que responda aos pedidos
@@ -140,14 +174,17 @@ class SNMPManager():
             while time.time() < now + self.timeout:
                 data, addr = self.socket.recvfrom(4096)
                 if addr[0] == self.agentIP:
-
+                    print(data)
                     if(data):
-                        dec_pdu = SNMPkeySharePDU.decode(data.decode())
                         print("Message received")
+                        decrypted_data = self.cypher.decrypt(data)
+                        dec_pdu = SNMPkeySharePDU.decode(decrypted_data.decode())
                         print(dec_pdu)
-                        message_received = True
-                        break
-                    
+                        if self.verify_authentication(dec_pdu):
+                            print(dec_pdu)
+                            message_received = True
+                            break
+                        
                 #TODO adicionar mais cenas aqui
                 # se quisermos saber a key de outro manager
                 #   temos que guardar todos os pedidos que fizemos e saber o tipo de cada um (get/set e oids pedido)
@@ -173,13 +210,14 @@ def read_configuration_file(config_file):
     agentIP = config['Agent']['ip']
     snmport = int(config['Agent']['snmpport'])
     V = int(config['Other']['V'])
-    return [agentIP, snmport, V]
+    KEY = str(config['Other']['KEY'])
+    return agentIP, snmport, V, KEY
 
 
 def main():
-    config_values = read_configuration_file("config.ini")
+    agentIP, snmport, V, KEY = read_configuration_file("config.ini")
     try:        
-        manager = SNMPManager(config_values[0], config_values[1], config_values[2])
+        manager = SNMPManager(agentIP, snmport, V, KEY)
     except KeyboardInterrupt:
         print("\nExiting...")
         sys.exit(0)

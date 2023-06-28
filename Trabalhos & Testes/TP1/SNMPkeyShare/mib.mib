@@ -49,33 +49,38 @@ systemRestartTime OBJECT-TYPE
 
 systemKeySize OBJECT-TYPE
     SYNTAX      INTEGER
-    MAX-ACCESS  read-write
+    MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION "The number of bytes (K) of each generated key."
     ::= { system 3 }
 
 systemIntervalUpdate OBJECT-TYPE
     SYNTAX      INTEGER
-    MAX-ACCESS  read-write
+    MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION "The number of milliseconds of the updating interval of the internal Z matrix."
     ::= { system 4 }
 
 systemMaxNumberOfKeys OBJECT-TYPE
     SYNTAX      INTEGER
-    MAX-ACCESS  read-write
+    MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION "The maximum number of generated keys that are still valid."
     ::= { system 5 }
 
 systemKeysTimeToLive OBJECT-TYPE
     SYNTAX      INTEGER
-    MAX-ACCESS  read-write
+    MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION "The number of seconds of the TTL of the generated keys."
     ::= { system 6 }
 
-
+systemRestartCounter OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of seconds that have passed since agent started/restarted."
+    ::= { system 7 }
 
 
 -- the config group
@@ -83,21 +88,21 @@ systemKeysTimeToLive OBJECT-TYPE
 -- to be defined in the MIB as they're only needed for internal computations
 configMasterKey OBJECT-TYPE
     SYNTAX      OCTET STRING
-    MAX-ACCESS  read-write
+    MAX-ACCESS  not-accessible
     STATUS      current
     DESCRIPTION "The master double key M with at least K*2 bytes in size."
     ::= { config 1 }
 
 configFirstCharOfKeysAlphabet OBJECT-TYPE
     SYNTAX      INTEGER
-    MAX-ACCESS  read-write
+    MAX-ACCESS  not-accessible
     STATUS      current
     DESCRIPTION "The ASCII code of the first character of the alphabet used in the keys (default=33)."
     ::= { config 2 }
 
 configCardinalityOfKeysAlphabet OBJECT-TYPE
     SYNTAX      INTEGER
-    MAX-ACCESS  read-write
+    MAX-ACCESS  not-accessible
     STATUS      current
     DESCRIPTION "The number of characters (Y) in the alphabet used in the keys (default=94)."
     ::= { config 3 }

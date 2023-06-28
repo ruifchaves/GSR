@@ -2,7 +2,7 @@
   "1": {
     "1": {
       "1": {
-        "NAME": "systemRestartDate",
+        "NAME": "zUpdateDate",
         "SYNTAX": "INTEGER",
         "MAX-ACCESS": "read-only",
         "STATUS": "current",
@@ -10,7 +10,7 @@
         "0": ""
       },
       "2": {
-        "NAME": "systemRestartTime",
+        "NAME": "zUpdateTime",
         "SYNTAX": "INTEGER",
         "MAX-ACCESS": "read-only",
         "STATUS": "current",
@@ -50,7 +50,7 @@
         "0": ""
       },
       "7": {
-        "NAME": "timestamp S",
+        "NAME": "systemRestartCounter or Timestamp S",
         "SYNTAX": "INTEGER",
         "MAX-ACCESS": "read-only",
         "STATUS": "current",

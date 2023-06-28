@@ -5,7 +5,7 @@ Descrição: Ficheiro que representa um gestor e que irá tratar de fazer os div
 
 
 
-import sys, os, socket, threading, random, time, configparser, re
+import sys, os, socket, random, time, configparser, re
 from SNMPkeySharePDU import SNMPkeySharePDU
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes, hmac
@@ -74,11 +74,11 @@ class SNMPManager():
     
 
     #! Funcao que calcula o MAC (Message Authentication Code) de uma mensagem
-    def calculate_authentication_code(self, P):
-        id = str(P).encode()  # Converte o identificador do PDU para bytes
+    def calculate_authentication_code(self, pdu):
+        partial_pdu = pdu.encode()
 
         hmac_alg = hmac.HMAC(self.key, hashes.SHA256())
-        hmac_alg.update(id)
+        hmac_alg.update(partial_pdu)
         authentication_code = hmac_alg.finalize()
 
         return str(authentication_code)[2:-1]
@@ -99,13 +99,13 @@ class SNMPManager():
             P = random.randint(0, 1000)
             Nl_Nw = int(values[0])
 
-
             pairs = re.findall(r'\((\d.\d.\d.(?:\d.)?\d),\s?(\d+)\)', command)
             tuple_list = [(x, y) for x, y in pairs]
 
-            auth_code = [self.calculate_authentication_code(P)]
-
-            pdu = SNMPkeySharePDU(1, len(auth_code), auth_code, P, Y, Nl_Nw, tuple_list, 1, [(0,0)])                    #type: ignore
+            pdu = SNMPkeySharePDU(0, 0, [], P, Y, Nl_Nw, tuple_list, 1, [(0,0)])   #type: ignore
+            auth_code = [self.calculate_authentication_code(pdu)]
+            
+            pdu = SNMPkeySharePDU(1, len(auth_code), auth_code, P, Y, Nl_Nw, tuple_list, 1, [(0,0)])   #type: ignore
             return pdu
         except:
             print("Invalid Command")
@@ -120,7 +120,7 @@ class SNMPManager():
 
         if P in self.p_time:
             diff_time = time.time() - self.p_time[P]
-            # "aconselhável que o gestor não utilize valores para P repetidos num intervalo temporal muito maior que V segundos": self.timeout*3
+            # NOTE "aconselhável que o gestor não utilize valores para P repetidos num intervalo temporal muito maior que V segundos": self.timeout*3
             if diff_time < (self.timeout *3) :
                 return False
 
@@ -176,15 +176,15 @@ class SNMPManager():
     def verify_authentication(self, pdu):
         if pdu.security_model == 1:
             auth_code_received = pdu.security_params_list[0]
-            auth_code_calculated = self.calculate_authentication_code(pdu.request_id)
+
+            partial_pdu = SNMPkeySharePDU(0, 0, [], pdu.request_id, pdu.primitive_type, pdu.num_instances, pdu.instances_values, pdu.num_errors, pdu.errors)
+            auth_code_calculated = self.calculate_authentication_code(partial_pdu)
 
             auth_code_calculated = auth_code_calculated
             if auth_code_received == auth_code_calculated:
-                # A mensagem é autêntica, continue com o processamento
-                return True
+                return True     # A mensagem é autêntica
             else:
-                # A mensagem não é autêntica, trate o caso adequadamente (por exemplo, rejeite a mensagem)
-                return False
+                return False    # A mensagem não é autêntica
 
     #! Funcao que recebe um PDU do gestor
     def get_response(self):

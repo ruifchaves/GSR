@@ -97,21 +97,28 @@ class RequestHandler(threading.Thread):
     def send_response(self, dec_pdu, addr, ret):
         print("Creating Response Message")
         try:
-            auth_code = [self.calculate_authentication_code(dec_pdu.request_id)]
             values_set, erros = self.sort_errors_from_instance(ret)
             if len(values_set) == 0:
-                answer_pdu = SNMPkeySharePDU(1, 1, auth_code, dec_pdu.request_id, 0, 1, [(0,0)], len(erros), erros)
+                answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, 1, [(0,0)], len(erros), erros)
             elif len(erros) == 0:
-                answer_pdu = SNMPkeySharePDU(1, 1, auth_code, dec_pdu.request_id, 0, len(values_set), values_set, 1, [(0,0)])
+                answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, 1, [(0,0)])
             else:
-                answer_pdu = SNMPkeySharePDU(1, 1, auth_code, dec_pdu.request_id, 0, len(values_set), values_set, len(erros), erros)
+                answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, len(values_set), values_set, len(erros), erros)
                 
+            auth_code = [self.calculate_authentication_code(answer_pdu)]
+
+            if len(values_set) == 0:
+                answer_pdu = SNMPkeySharePDU(1, len(auth_code), auth_code, dec_pdu.request_id, 0, 1, [(0,0)], len(erros), erros)
+            elif len(erros) == 0:
+                answer_pdu = SNMPkeySharePDU(1, len(auth_code), auth_code, dec_pdu.request_id, 0, len(values_set), values_set, 1, [(0,0)])
+            else:
+                answer_pdu = SNMPkeySharePDU(1, len(auth_code), auth_code, dec_pdu.request_id, 0, len(values_set), values_set, len(erros), erros)
+
             enc_answer_pdu = answer_pdu.encode()
             if len(enc_answer_pdu) > 1500:
-                answer_pdu = SNMPkeySharePDU(1, 1, auth_code, dec_pdu.request_id, 0, 1, [(0,0)], 1, [(0,1)])
+                answer_pdu = SNMPkeySharePDU(1, len(auth_code), auth_code, dec_pdu.request_id, 0, 1, [(0,0)], 1, [(0,1)])
                 enc_answer_pdu = answer_pdu.encode()
                 
-            print(answer_pdu)
             encrypted_response = self.CYPHER.encrypt(enc_answer_pdu)
             try:
                 self.socket.sendto(encrypted_response, addr)
@@ -292,19 +299,22 @@ class RequestHandler(threading.Thread):
 
 
     #! Funcao que calcula o MAC (Message Authentication Code) de uma mensagem
-    def calculate_authentication_code(self, P):
-        id = str(P).encode()  # Converte o identificador do PDU para bytes
-        
+    def calculate_authentication_code(self, pdu):
+        partial_pdu = pdu.encode()
+
         hmac_alg = hmac.HMAC(self.KEY, hashes.SHA256())
-        hmac_alg.update(id)
+        hmac_alg.update(partial_pdu)
         authentication_code = hmac_alg.finalize()
+
         return str(authentication_code)[2:-1]
 
     #! Funcao que verifica se a mensagem recebida é autêntica
     def verify_authentication(self, pdu):
         if pdu.security_model == 1:
             auth_code_received = pdu.security_params_list[0]
-            auth_code_calculated = self.calculate_authentication_code(pdu.request_id)
+
+            partial_pdu = SNMPkeySharePDU(0, 0, [], pdu.request_id, pdu.primitive_type, pdu.num_instances, pdu.instances_values, pdu.num_errors, pdu.errors)
+            auth_code_calculated = self.calculate_authentication_code(partial_pdu)
 
             auth_code_calculated = auth_code_calculated
             if auth_code_received == auth_code_calculated:
@@ -368,6 +378,7 @@ class RequestHandler(threading.Thread):
                         dec_pdu = SNMPkeySharePDU.decode(decrypted_data.decode())
                         valid_or_not = self.verify_pdu(dec_pdu, addr)
                         if valid_or_not[0]:
+                            print(dec_pdu)
                             if dec_pdu.primitive_type == 1:
                                 print("Get request received")
                                 self.get_request(dec_pdu, addr)
@@ -379,6 +390,10 @@ class RequestHandler(threading.Thread):
 
                         elif valid_or_not[1] == -1:
                             raise Exception(f"Invalid PDU: Number of elements of instances list ({dec_pdu.num_instances}) is not the same as the size of the list ({len(dec_pdu.instances_values)}).")  #type: ignore
+                        elif valid_or_not[1] == -2:
+                            raise Exception(f"Invalid PDU: Number of elements of security list ({dec_pdu.security_params_num}) is not the same as the size of the list ({len(dec_pdu.security_params_list)}).")  #type: ignore
+                        elif valid_or_not[1] == -3:
+                            raise Exception(f"Invalid PDU: PDU is not authentic and might have been modified).")  #type: ignore
                         else:
                             raise Exception(f"Invalid PDU: Wait {valid_or_not[1]} seconds before reusing the Request ID {dec_pdu.request_id}.")  #type: ignore
 

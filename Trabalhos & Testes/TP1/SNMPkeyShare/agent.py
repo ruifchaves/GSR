@@ -116,6 +116,8 @@ class RequestHandler(threading.Thread):
 
             enc_answer_pdu = answer_pdu.encode()
             if len(enc_answer_pdu) > 1500:
+                answer_pdu = SNMPkeySharePDU(0, 0, [], dec_pdu.request_id, 0, 1, [(0,0)], 1, [(0,1)])
+                auth_code = [self.calculate_authentication_code(answer_pdu)]
                 answer_pdu = SNMPkeySharePDU(1, len(auth_code), auth_code, dec_pdu.request_id, 0, 1, [(0,0)], 1, [(0,1)])
                 enc_answer_pdu = answer_pdu.encode()
                 
